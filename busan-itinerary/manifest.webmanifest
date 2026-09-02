@@ -1,0 +1,17 @@
+{
+  "name": "釜山潮汐行程表",
+  "short_name": "釜山行程",
+  "description": "釜山 2026/10/09–10/14 自由行行程表",
+  "lang": "zh-Hant",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0A3550",
+  "theme_color": "#0A3550",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
