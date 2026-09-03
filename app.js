@@ -15,6 +15,19 @@ var CLIENT=Math.random().toString(36).slice(2,10);
 var LS="busan-tide-plan-v1";
 var state=null, activeDay="d1", filterCat=null, query="", sel=null, sheetCtx=null;
 
+/* 重整後維持在原本的分頁／日期／篩選(跟行程資料分開存,分享網址不會帶到這些)。 */
+var UI_KEY="busan-tide-ui-v1";
+function loadUiState(){
+  try{ var raw=localStorage.getItem(UI_KEY); if(raw) return JSON.parse(raw); }catch(e){}
+  return null;
+}
+function saveUiState(){
+  try{
+    localStorage.setItem(UI_KEY,JSON.stringify({view:currentView,day:activeDay,taskFilter:taskFilter,packFilter:packFilter}));
+  }catch(e){}
+}
+var uiState=loadUiState();
+
 function seed(){
   return {spots:JSON.parse(JSON.stringify(SEED_SPOTS)),
           events:JSON.parse(JSON.stringify(SEED_EVENTS)),
@@ -31,6 +44,7 @@ state=loadLocal()||seed();
 if(!state.todos) state.todos=JSON.parse(JSON.stringify(SEED_TODOS));
 if(!state.tasks) state.tasks=JSON.parse(JSON.stringify(SEED_TASKS));
 if(!state.packing) state.packing=JSON.parse(JSON.stringify(SEED_PACKING));
+if(uiState&&uiState.day&&DAYS.some(function(d){return d.id===uiState.day;})) activeDay=uiState.day;
 
 /* ============ storage ============ */
 var dot=document.getElementById("syncDot"), stxt=document.getElementById("syncText");
@@ -438,14 +452,14 @@ function renderWhoFilterBar(mountId,getVal,setVal,rerenderList){
     b.setAttribute("aria-pressed",getVal()===f.id?"true":"false");
     b.style.setProperty("--cat",f.color);
     b.addEventListener("click",function(){
-      setVal(f.id); renderWhoFilterBar(mountId,getVal,setVal,rerenderList); rerenderList();
+      setVal(f.id); renderWhoFilterBar(mountId,getVal,setVal,rerenderList); rerenderList(); saveUiState();
     });
     w.appendChild(b);
   });
 }
 
 /* ============ tasks(代辦):卡片版,可貼網址、設 deadline、備註,還能依人篩選 ============ */
-var taskFilter="all";
+var taskFilter=(uiState&&(uiState.taskFilter==="lee"||uiState.taskFilter==="kiwi"))?uiState.taskFilter:"all";
 function renderTaskFilter(){
   renderWhoFilterBar("taskWhoFilter",function(){return taskFilter;},function(v){taskFilter=v;},renderTasks);
 }
@@ -547,7 +561,7 @@ function guessPackIcon(text){
   for(var i=0;i<PACK_ICON_RULES.length;i++){ if(PACK_ICON_RULES[i][0].test(text)) return PACK_ICON_RULES[i][1]; }
   return "🧳";
 }
-var packFilter="all";
+var packFilter=(uiState&&(uiState.packFilter==="lee"||uiState.packFilter==="kiwi"))?uiState.packFilter:"all";
 function renderPackFilter(){
   renderWhoFilterBar("packWhoFilter",function(){return packFilter;},function(v){packFilter=v;},renderPacking);
 }
@@ -944,7 +958,7 @@ $("daySel").addEventListener("change",function(){
   activeDay=$("daySel").value;
   /* 在待確認/代辦/要帶時挑日期,直接跳回那天的行程表 */
   if(currentView!=="itin") switchView("itin");
-  renderGrid(); renderSpots(); scrollToDay();
+  renderGrid(); renderSpots(); scrollToDay(); saveUiState();
 });
 
 /* 主檢視切換:行程表 / 待確認 / 代辦 / 要帶。景點櫃固定在右側,不受切換影響。
@@ -967,6 +981,7 @@ function switchView(which){
     $(v.panel).hidden=!on;
   });
   $("daySel").classList.toggle("is-idle", which!=="itin");
+  saveUiState();
 }
 
 function renderAll(){ renderDaySelect(); renderGrid(); renderFilters(); renderSpots(); renderTodos(); renderTaskFilter(); renderTasks(); renderPackFilter(); renderPacking(); }
@@ -975,4 +990,6 @@ function scrollToDay(){
   if(list.length) anchor=list.reduce(function(a,b){ return a.start<b.start?a:b; }).start;
   scroller.scrollTop=Math.max(0,(anchor-DAY_START)*PPM-46);
 }
-renderAll(); switchView("itin"); scrollToDay();
+/* 重整後回到原本那個分頁(行程表/待確認/代辦/要帶);沒存過或值不對就照舊預設行程表。 */
+var initialView=(uiState&&VIEWS.some(function(v){return v.k===uiState.view;}))?uiState.view:"itin";
+renderAll(); switchView(initialView); scrollToDay();
