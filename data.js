@@ -145,27 +145,32 @@ var SEED_TODOS=[
  {id:"t6",text:"翻書動畫工作室(甘川洞):是否需預約",done:false}
 ];
 
+/* 代辦除了 text/done,還有 who(指定給誰的陣列,如 ["lee"]、["lee","kiwi"]、兩人都不填就 []、
+   兩人都要做就兩個都放進去)、url(要貼的網址,方便大家不用重複找)、
+   deadline(YYYY-MM-DD,可留空)、note(備註)。 */
 var SEED_TASKS=[
- {id:"k1",text:"換韓元,或確認海外提款卡/信用卡預借額度",done:false},
- {id:"k2",text:"手機上網:訂 eSIM 或租 WiFi 機",done:false},
- {id:"k3",text:"下載 App:Naver Map、KakaoMap、Papago、Kakao T(叫車)",done:false},
- {id:"k4",text:"確認 K-ETA / 入境檢疫申報(Q-code)最新規定",done:false},
- {id:"k5",text:"到機場後買交通卡(Cashbee／T-money)並儲值現金",done:false},
- {id:"k6",text:"訂機場↔海雲台交通(利木津巴士或計程車)",done:false},
- {id:"k7",text:"投保旅平險,並把保單、訂房確認拍照存手機",done:false},
- {id:"k8",text:"用右上「分享網址」把行程傳一份給家人",done:false}
+ {id:"k1",text:"換韓元,或確認海外提款卡/信用卡預借額度",done:false,who:[],url:"",deadline:"",note:""},
+ {id:"k2",text:"手機上網:訂 eSIM 或租 WiFi 機",done:false,who:[],url:"",deadline:"",note:""},
+ {id:"k3",text:"下載 App:Naver Map、KakaoMap、Papago、Kakao T(叫車)",done:false,who:[],url:"",deadline:"",note:""},
+ {id:"k4",text:"確認 K-ETA / 入境檢疫申報(Q-code)最新規定",done:false,who:[],url:"",deadline:"",note:""},
+ {id:"k5",text:"到機場後買交通卡(Cashbee／T-money)並儲值現金",done:false,who:[],url:"",deadline:"",note:""},
+ {id:"k6",text:"訂機場↔海雲台交通(利木津巴士或計程車)",done:false,who:[],url:"",deadline:"",note:""},
+ {id:"k7",text:"投保旅平險,並把保單、訂房確認拍照存手機",done:false,who:[],url:"",deadline:"",note:""},
+ {id:"k8",text:"用右上「分享網址」把行程傳一份給家人",done:false,who:[],url:"",deadline:"",note:""}
 ];
 
+/* 要帶的 icon 是依 text 內容自動猜的(見 app.js guessPackIcon),這裡不用存。
+   who 跟代辦一樣是陣列,兩人都要帶可以同時指定 ["lee","kiwi"]。 */
 var SEED_PACKING=[
- {id:"p1",text:"護照 + 影本、證件照 2 張",done:false},
- {id:"p2",text:"信用卡(海外回饋)+ 少量現金",done:false},
- {id:"p3",text:"韓國插座轉接頭(220V,C/F 型)",done:false},
- {id:"p4",text:"行動電源(手提行李,不能託運)",done:false},
- {id:"p5",text:"常備藥、腸胃藥、暈車藥、OK 繃",done:false},
- {id:"p6",text:"保養／防曬,醫美後修護用品分裝",done:false},
- {id:"p7",text:"泳衣、薄外套(海邊風大、日夜溫差)",done:false},
- {id:"p8",text:"好走的鞋(甘川洞、冬柏島、荒嶺山都有坡)",done:false},
- {id:"p9",text:"環保購物袋、輕便雨具",done:false}
+ {id:"p1",text:"護照 + 影本、證件照 2 張",done:false,who:[]},
+ {id:"p2",text:"信用卡(海外回饋)+ 少量現金",done:false,who:[]},
+ {id:"p3",text:"韓國插座轉接頭(220V,C/F 型)",done:false,who:[]},
+ {id:"p4",text:"行動電源(手提行李,不能託運)",done:false,who:[]},
+ {id:"p5",text:"常備藥、腸胃藥、暈車藥、OK 繃",done:false,who:[]},
+ {id:"p6",text:"保養／防曬,醫美後修護用品分裝",done:false,who:[]},
+ {id:"p7",text:"泳衣、薄外套(海邊風大、日夜溫差)",done:false,who:[]},
+ {id:"p8",text:"好走的鞋(甘川洞、冬柏島、荒嶺山都有坡)",done:false,who:[]},
+ {id:"p9",text:"環保購物袋、輕便雨具",done:false,who:[]}
 ];
 
 export {

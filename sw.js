@@ -1,8 +1,9 @@
 /* 釜山潮汐行程表 — 離線快取
    策略:優先走網路(這樣改版會立刻生效),沒網路時回退到快取。 */
-const CACHE = 'busan-tide-v10';
+const CACHE = 'busan-tide-v14';
 const ASSETS = ['./', './index.html', './styles.css', './data.js', './app.js',
-  './manifest.webmanifest', './icon-192.png?v=10', './icon-512.png?v=10'];
+  './manifest.webmanifest', './masthead-gwangan.webp?v=11',
+  './icon-192.png?v=13', './icon-512.png?v=13'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));

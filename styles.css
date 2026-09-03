@@ -57,19 +57,34 @@ input,textarea,select{font:inherit;color:inherit}
 /* ---------- masthead ---------- */
 .masthead{position:relative;background:linear-gradient(175deg,#0A3550 0%,#0C4A63 45%,#0E6E82 100%);
   color:#EAF6F7;overflow:hidden;padding:26px 24px 0}
-.masthead__inner{position:relative;z-index:2;max-width:1440px;margin:0 auto;
+.masthead__inner{position:relative;z-index:3;max-width:1440px;margin:0 auto;
   display:flex;flex-wrap:wrap;align-items:flex-end;gap:20px 32px;padding-bottom:34px}
 .wordmark{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
 .wordmark b{font-family:var(--serif);font-weight:700;font-size:clamp(30px,5vw,46px);
-  letter-spacing:.01em;line-height:1;text-wrap:balance}
+  letter-spacing:.01em;line-height:1;text-wrap:balance;text-shadow:0 1px 10px rgba(4,22,34,.55)}
 .wordmark span{font-family:var(--serif);font-weight:500;font-size:clamp(14px,2vw,19px);
   letter-spacing:.34em;text-transform:uppercase;color:var(--foam);opacity:.85}
-.mast-meta{display:flex;gap:26px;flex-wrap:wrap;margin-left:auto;align-items:flex-end}
+.mast-meta{display:flex;gap:26px;flex-wrap:wrap;margin-left:0;align-items:flex-end}
 .meta{display:flex;flex-direction:column;gap:3px}
-.meta dt{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:rgba(234,246,247,.62)}
-.meta dd{margin:0;font-family:var(--mono);font-size:13.5px;font-variant-numeric:tabular-nums;color:#EAF6F7}
+.meta dt{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:rgba(234,246,247,.72);
+  text-shadow:0 1px 6px rgba(4,22,34,.6)}
+.meta dd{margin:0;font-family:var(--mono);font-size:13.5px;font-variant-numeric:tabular-nums;color:#EAF6F7;
+  text-shadow:0 1px 8px rgba(4,22,34,.7)}
 .meta dd em{font-style:normal;color:var(--foam)}
-.waves{position:absolute;left:0;right:0;bottom:-1px;width:100%;height:88px;z-index:1;display:block}
+.waves{position:absolute;left:0;right:0;bottom:-1px;width:100%;height:88px;z-index:2;display:block}
+.waves__haze{fill:var(--haze)}
+
+/* 頁首主視覺:廣安里線稿(與 App 圖示同一幅畫)。
+   只在「釜山」跟日期資訊中間放一小塊,不撐滿頁首、也不會擋到任何文字。
+   用 mask 把單色調的線稿疊在漸層上,顏色可跟著主題走,檔案也比整張圖小。 */
+.masthead__art{flex:1 1 100px;min-width:60px;max-width:280px;align-self:stretch;
+  display:flex;align-items:flex-end;justify-content:center;pointer-events:none;overflow:hidden}
+.masthead__art>i{display:block;width:100%;max-width:220px;height:clamp(28px,4vw,44px);
+  margin-bottom:6px;opacity:.55;background:var(--foam);
+  -webkit-mask-image:url("masthead-gwangan.webp?v=11");mask-image:url("masthead-gwangan.webp?v=11");
+  -webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;
+  -webkit-mask-position:center 56%;mask-position:center 56%;
+  -webkit-mask-size:cover;mask-size:cover}
 
 /* ---------- view bar ---------- */
 .viewbar{position:sticky;top:0;z-index:30;background:var(--shell);
@@ -84,7 +99,11 @@ input,textarea,select{font:inherit;color:inherit}
 .viewtab[aria-selected="true"]{background:var(--brine);border-color:var(--brine);color:#fff}
 .viewtab u{text-decoration:none;font-family:var(--mono);font-size:11px;opacity:.72;margin-left:5px}
 .daysel{padding:7px 10px;border:1px solid var(--line);border-radius:9px;background:var(--shell-2);
-  font-size:13px;font-family:inherit;max-width:240px;margin-right:6px}
+  font-size:13px;font-family:inherit;max-width:240px;margin-right:6px;
+  transition:opacity .15s ease}
+/* 不在行程表時日期選單仍留在原位(位置不跳動),只是淡一點;選了就跳回那天 */
+.daysel.is-idle{opacity:.6}
+.daysel.is-idle:hover,.daysel.is-idle:focus{opacity:1}
 
 /* ---------- bar tools ---------- */
 .railtools{display:flex;gap:6px;flex:0 0 auto;flex-wrap:wrap}
@@ -171,6 +190,7 @@ input,textarea,select{font:inherit;color:inherit}
 
 /* ---------- checklist view ---------- */
 .listwrap{padding:14px 16px 22px;max-width:760px}
+#panelTasks .listwrap,#panelPacking .listwrap{max-width:1120px}
 .listwrap .btn{display:block;width:100%;margin-top:10px}
 .listwrap #resetAll{margin-top:26px}
 .tools{display:flex;gap:7px;margin-bottom:9px}
@@ -213,7 +233,57 @@ input,textarea,select{font:inherit;color:inherit}
   border:1px solid var(--line-soft);background:var(--shell-2)}
 .todo input{margin-top:2px;width:15px;height:15px;accent-color:var(--brine);flex:0 0 auto}
 .todo__t{font-size:12.5px;line-height:1.45}
+.todo.done{background:var(--line-soft)}
 .todo.done .todo__t{color:var(--text-3);text-decoration:line-through}
+
+/* 誰要做:代辦／要帶清單裡的兩顆人名切換鈕(不指定就都不亮) */
+.who{display:flex;gap:4px;flex:0 0 auto;margin-left:auto;align-items:center}
+.whobtn{padding:3px 9px;border-radius:999px;border:1px solid var(--line);font-size:10.5px;
+  font-weight:600;background:var(--shell);color:var(--text-2);letter-spacing:.02em;white-space:nowrap}
+.whobtn:hover{border-color:var(--text-3);color:var(--text)}
+.who--lee.on{background:var(--c-play);border-color:var(--c-play);color:#fff}
+.who--kiwi.on{background:var(--c-stay);border-color:var(--c-stay);color:#fff}
+.todo.done .whobtn{opacity:.6}
+
+/* ---------- 代辦卡片(方格排列,一張卡放名稱/網址/期限/人員/備註) ---------- */
+/* minmax 用 min() 夾住,螢幕比 258px 還窄時軌道會跟著縮,不會把整頁撐寬。 */
+.taskgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(258px,100%),1fr));gap:12px;margin-bottom:4px}
+.taskcard{display:flex;flex-direction:column;gap:9px;padding:12px 13px 13px;border-radius:12px;
+  border:1px solid var(--line-soft);background:var(--shell-2);min-width:0}
+.taskcard.done{background:var(--line-soft)}
+.taskcard__top{display:flex;align-items:flex-start;gap:8px}
+.taskcard__top input[type="checkbox"]{margin-top:3px;width:15px;height:15px;accent-color:var(--brine);flex:0 0 auto}
+.taskcard__name{flex:1;min-width:0;font-size:13px;font-weight:600;line-height:1.4;color:var(--text)}
+.taskcard.done .taskcard__name{color:var(--text-3);text-decoration:line-through;font-weight:500}
+.taskcard__row{display:flex;flex-direction:column;gap:4px;min-width:0}
+.taskcard__row--split{flex-direction:row;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:10px}
+.taskcard__lbl{font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--text-3)}
+.taskcard__urlwrap,.taskcard__ddrow{display:flex;gap:6px;align-items:center;min-width:0}
+.taskcard__deadline{min-width:0;flex:1 1 auto}
+.taskcard input[type="url"],.taskcard input[type="date"]{padding:5px 8px;border:1px solid var(--line);
+  border-radius:7px;background:var(--shell);font-size:11.5px;font-family:inherit;color:var(--text);min-width:0}
+.taskcard input[type="url"]{flex:1;width:100%}
+.taskcard input[type="date"]{flex:1 1 110px;max-width:132px}
+.taskcard__go{flex:0 0 auto;width:26px;height:26px;display:flex;align-items:center;justify-content:center;
+  border-radius:7px;border:1px solid var(--line);color:var(--brine);text-decoration:none;font-size:13px}
+.taskcard__go:hover{background:var(--shell);border-color:var(--brine)}
+.taskcard__dd{font-size:10.5px;color:var(--text-3);white-space:nowrap}
+.taskcard__dd.warn{color:var(--persimmon);font-weight:600}
+.taskcard__note{font-size:11.5px;line-height:1.5;color:var(--text-2);min-height:20px;
+  padding:5px 7px;border-radius:7px;background:var(--shell);border:1px solid var(--line-soft);white-space:pre-wrap}
+.taskcard__note:empty:before{content:attr(data-ph);color:var(--text-3)}
+
+/* ---------- 要帶卡片(方格,icon 依名稱自動猜) ---------- */
+.packgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(190px,100%),1fr));gap:10px;margin-bottom:4px}
+.packcard{display:flex;flex-direction:column;gap:8px;padding:10px 12px;border-radius:12px;
+  border:1px solid var(--line-soft);background:var(--shell-2);min-width:0}
+.packcard.done{background:var(--line-soft)}
+.packcard__top{display:flex;align-items:flex-start;gap:7px}
+.packcard__icon{flex:0 0 auto;font-size:17px;line-height:1.3;margin-top:1px}
+.packcard__top input[type="checkbox"]{margin-top:3px;width:15px;height:15px;accent-color:var(--brine);flex:0 0 auto}
+.packcard__name{flex:1;min-width:0;font-size:12.5px;line-height:1.4;color:var(--text)}
+.packcard.done .packcard__name{color:var(--text-3);text-decoration:line-through}
+.packcard.done .packcard__icon{opacity:.5}
 
 /* ---------- detail sheet ---------- */
 .scrim{position:fixed;inset:0;background:rgba(6,26,38,.4);z-index:60;opacity:0;pointer-events:none;
@@ -289,7 +359,7 @@ input,textarea,select{font:inherit;color:inherit}
   .masthead__inner{padding-bottom:26px;gap:14px}
   .waves{height:58px}
   .app{padding:14px 16px 48px}
-  .bridge{display:none}
+  .masthead__art{display:none}
   .mast-meta{margin-left:0;width:100%;display:grid;grid-template-columns:1fr 1fr;gap:12px 16px}
   .mast-meta .meta:first-child{grid-column:1 / -1}
   .meta dd{font-size:12px}

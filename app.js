@@ -404,8 +404,180 @@ function renderChecklist(key,mountId,countId){
   });
 }
 function renderTodos(){ renderChecklist("todos","todos","todoCount"); }
-function renderTasks(){ renderChecklist("tasks","tasks","taskCount"); }
-function renderPacking(){ renderChecklist("packing","packing","packCount"); }
+
+/* 代辦／要帶都能指定給誰,而且兩個人可以同時指定(誰都要做的事)。
+   who 存成陣列,如 ["lee","kiwi"];whoArr() 順便相容舊資料(單一字串)。 */
+var PEOPLE=[{id:"lee",label:"Lee"},{id:"kiwi",label:"Kiwi"}];
+function whoArr(t){
+  if(Array.isArray(t.who)) return t.who.filter(function(id){return id==="lee"||id==="kiwi";});
+  if(typeof t.who==="string" && t.who) return [t.who];
+  return [];
+}
+function buildWhoPills(t,onChange){
+  var who=el("div","who"); var arr=whoArr(t);
+  PEOPLE.forEach(function(person){
+    var on=arr.indexOf(person.id)!==-1;
+    var btn=el("button","whobtn who--"+person.id+(on?" on":""),person.label);
+    btn.type="button"; btn.title="指定給 "+person.label+"(兩人都要做就都點亮)";
+    btn.addEventListener("click",function(){
+      var cur=whoArr(t), idx=cur.indexOf(person.id);
+      if(idx===-1) cur.push(person.id); else cur.splice(idx,1);
+      t.who=cur; persist(); onChange();
+    });
+    who.appendChild(btn);
+  });
+  return who;
+}
+
+/* 代辦／要帶共用的「全部／Lee／Kiwi」篩選鈕列。 */
+var WHO_FILTERS=[{id:"all",label:"全部",color:"var(--brine)"},{id:"lee",label:"Lee",color:"var(--c-play)"},{id:"kiwi",label:"Kiwi",color:"var(--c-stay)"}];
+function renderWhoFilterBar(mountId,getVal,setVal,rerenderList){
+  var w=$(mountId); w.innerHTML="";
+  WHO_FILTERS.forEach(function(f){
+    var b=el("button","filt",f.label); b.type="button";
+    b.setAttribute("aria-pressed",getVal()===f.id?"true":"false");
+    b.style.setProperty("--cat",f.color);
+    b.addEventListener("click",function(){
+      setVal(f.id); renderWhoFilterBar(mountId,getVal,setVal,rerenderList); rerenderList();
+    });
+    w.appendChild(b);
+  });
+}
+
+/* ============ tasks(代辦):卡片版,可貼網址、設 deadline、備註,還能依人篩選 ============ */
+var taskFilter="all";
+function renderTaskFilter(){
+  renderWhoFilterBar("taskWhoFilter",function(){return taskFilter;},function(v){taskFilter=v;},renderTasks);
+}
+function deadlineInfo(dstr){
+  if(!dstr) return {text:"",warn:false};
+  var target=new Date(dstr+"T00:00:00");
+  if(isNaN(target.getTime())) return {text:"",warn:false};
+  var now=new Date(), today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  var d=Math.round((target-today)/86400000);
+  if(d>0) return {text:"還有 "+d+" 天",warn:d<=3};
+  if(d===0) return {text:"就是今天",warn:true};
+  return {text:"已過期 "+(-d)+" 天",warn:true};
+}
+function renderTasks(){
+  var w=$("tasks"); w.innerHTML="";
+  var list=state.tasks||[];
+  var open=list.filter(function(t){return !t.done;}).length;
+  $("taskCount").textContent=list.length?(open?open:"✓"):"";
+  var shown=taskFilter==="all"?list:list.filter(function(t){return whoArr(t).indexOf(taskFilter)!==-1;});
+  if(!shown.length){ w.appendChild(el("div","none",list.length?"這個人目前沒有代辦":"目前沒有代辦")); return; }
+  shown.forEach(function(t){
+    var card=el("div","taskcard"+(t.done?" done":""));
+
+    var top=el("div","taskcard__top");
+    var cb=document.createElement("input"); cb.type="checkbox"; cb.checked=!!t.done;
+    cb.addEventListener("change",function(){ t.done=cb.checked; persist(); renderTasks(); });
+    top.appendChild(cb);
+    var name=el("div","taskcard__name",t.text); name.contentEditable="true"; name.spellcheck=false;
+    name.addEventListener("blur",function(){ t.text=name.textContent.trim()||t.text; persist(); });
+    top.appendChild(name);
+    var del=el("button","mini","✕"); del.title="刪除";
+    del.addEventListener("click",function(){ state.tasks=state.tasks.filter(function(x){return x!==t;}); persist(); renderTasks(); });
+    top.appendChild(del);
+    card.appendChild(top);
+
+    var urlRow=el("div","taskcard__row");
+    urlRow.appendChild(el("label","taskcard__lbl","網址"));
+    var urlWrap=el("div","taskcard__urlwrap");
+    var urlInput=document.createElement("input"); urlInput.type="url"; urlInput.placeholder="貼上網址…";
+    urlInput.value=t.url||"";
+    urlInput.addEventListener("change",function(){ t.url=urlInput.value.trim(); persist(); renderTasks(); });
+    urlWrap.appendChild(urlInput);
+    if(t.url){
+      var go=document.createElement("a"); go.className="taskcard__go"; go.href=t.url;
+      go.target="_blank"; go.rel="noopener"; go.title="開啟連結"; go.textContent="↗";
+      urlWrap.appendChild(go);
+    }
+    urlRow.appendChild(urlWrap);
+    card.appendChild(urlRow);
+
+    var splitRow=el("div","taskcard__row taskcard__row--split");
+    var ddWrap=el("div","taskcard__deadline");
+    ddWrap.appendChild(el("label","taskcard__lbl","期限"));
+    var ddRow=el("div","taskcard__ddrow");
+    var ddInput=document.createElement("input"); ddInput.type="date"; ddInput.value=t.deadline||"";
+    ddInput.addEventListener("change",function(){ t.deadline=ddInput.value; persist(); renderTasks(); });
+    ddRow.appendChild(ddInput);
+    var info=deadlineInfo(t.deadline);
+    if(info.text) ddRow.appendChild(el("span","taskcard__dd"+(info.warn?" warn":""),info.text));
+    ddWrap.appendChild(ddRow);
+    splitRow.appendChild(ddWrap);
+
+    splitRow.appendChild(buildWhoPills(t,renderTasks));
+    card.appendChild(splitRow);
+
+    var noteRow=el("div","taskcard__row");
+    noteRow.appendChild(el("label","taskcard__lbl","備註"));
+    var note=el("div","taskcard__note"); note.contentEditable="true"; note.spellcheck=false;
+    note.setAttribute("data-ph","加一點備註…"); note.textContent=t.note||"";
+    note.addEventListener("blur",function(){ t.note=note.textContent.trim(); persist(); });
+    noteRow.appendChild(note);
+    card.appendChild(noteRow);
+
+    w.appendChild(card);
+  });
+}
+
+/* ============ packing(要帶):卡片版,依名稱自動猜一個對應的 icon ============ */
+var PACK_ICON_RULES=[
+  [/護照|簽證|證件照|入境|海關/,"🛂"],
+  [/現金|信用卡|提款卡|韓元|錢包/,"💳"],
+  [/轉接頭|插座|充電器|傳輸線|插頭/,"🔌"],
+  [/行動電源|電池/,"🔋"],
+  [/藥|ok繃|OK繃|暈車|腸胃|感冒|止痛/i,"💊"],
+  [/防曬|保養|乳液|面膜|修護|化妝/,"🧴"],
+  [/泳衣|泳褲|外套|衣服|褲|襪子/,"👕"],
+  [/鞋/,"👟"],
+  [/雨具|雨傘|雨衣/,"☂️"],
+  [/購物袋|環保袋|袋子/,"🛍️"],
+  [/相機|自拍棒|腳架|底片/,"📷"],
+  [/耳機/,"🎧"],
+  [/眼鏡/,"🕶️"],
+  [/毛巾|盥洗|牙刷|牙膏|洗面乳/,"🧼"],
+  [/文件|資料|列印|訂房|機票|保單/,"📄"],
+  [/手機|行動網路|esim|eSIM|wifi|WiFi|SIM/,"📶"]
+];
+function guessPackIcon(text){
+  text=text||"";
+  for(var i=0;i<PACK_ICON_RULES.length;i++){ if(PACK_ICON_RULES[i][0].test(text)) return PACK_ICON_RULES[i][1]; }
+  return "🧳";
+}
+var packFilter="all";
+function renderPackFilter(){
+  renderWhoFilterBar("packWhoFilter",function(){return packFilter;},function(v){packFilter=v;},renderPacking);
+}
+function renderPacking(){
+  var w=$("packing"); w.innerHTML="";
+  var list=state.packing||[];
+  var open=list.filter(function(t){return !t.done;}).length;
+  $("packCount").textContent=list.length?(open?open:"✓"):"";
+  var shown=packFilter==="all"?list:list.filter(function(t){return whoArr(t).indexOf(packFilter)!==-1;});
+  if(!shown.length){ w.appendChild(el("div","none",list.length?"這個人目前沒有要帶的東西":"目前沒有要帶的東西")); return; }
+  shown.forEach(function(t){
+    var card=el("div","packcard"+(t.done?" done":""));
+
+    var top=el("div","packcard__top");
+    top.appendChild(el("span","packcard__icon",guessPackIcon(t.text)));
+    var cb=document.createElement("input"); cb.type="checkbox"; cb.checked=!!t.done;
+    cb.addEventListener("change",function(){ t.done=cb.checked; persist(); renderPacking(); });
+    top.appendChild(cb);
+    var name=el("div","packcard__name",t.text); name.contentEditable="true"; name.spellcheck=false;
+    name.addEventListener("blur",function(){ t.text=name.textContent.trim()||t.text; persist(); renderPacking(); });
+    top.appendChild(name);
+    var del=el("button","mini","✕"); del.title="刪除";
+    del.addEventListener("click",function(){ state.packing=state.packing.filter(function(x){return x!==t;}); persist(); renderPacking(); });
+    top.appendChild(del);
+    card.appendChild(top);
+
+    card.appendChild(buildWhoPills(t,renderPacking));
+    w.appendChild(card);
+  });
+}
 
 /* ============ drag ============ */
 var drag=null, ghost=null, preview=null, rafId=null, lastDragEnd=0;
@@ -755,10 +927,11 @@ $("addTodo").addEventListener("click",function(){
   state.todos.push({id:uid("t"),text:"新的待辦事項",done:false}); persist(); renderTodos();
 });
 $("addTask").addEventListener("click",function(){
-  state.tasks.push({id:uid("k"),text:"新的代辦事項",done:false}); persist(); renderTasks();
+  state.tasks.push({id:uid("k"),text:"新的代辦事項",done:false,who:[],url:"",deadline:"",note:""});
+  persist(); renderTasks();
 });
 $("addPack").addEventListener("click",function(){
-  state.packing.push({id:uid("p"),text:"要帶的東西",done:false}); persist(); renderPacking();
+  state.packing.push({id:uid("p"),text:"要帶的東西",done:false,who:[]}); persist(); renderPacking();
 });
 var resetArmed=false;
 $("resetAll").addEventListener("click",function(){
@@ -768,10 +941,15 @@ $("resetAll").addEventListener("click",function(){
   state=seed(); viewingShared=false; hideBanner(); persist(); renderAll(); b.textContent="回復預設行程"; resetArmed=false; toast("已回復預設");
 });
 $("daySel").addEventListener("change",function(){
-  activeDay=$("daySel").value; renderGrid(); renderSpots(); scrollToDay();
+  activeDay=$("daySel").value;
+  /* 在待確認/代辦/要帶時挑日期,直接跳回那天的行程表 */
+  if(currentView!=="itin") switchView("itin");
+  renderGrid(); renderSpots(); scrollToDay();
 });
 
-/* 主檢視切換:行程表 / 待確認 / 代辦 / 要帶。景點櫃固定在右側,不受切換影響。 */
+/* 主檢視切換:行程表 / 待確認 / 代辦 / 要帶。景點櫃固定在右側,不受切換影響。
+   日期選單四個檢視都留著,分頁按鈕的位置才不會跳來跳去。 */
+var currentView="itin";
 var VIEWS=[
   {k:"itin",tab:"viewItin",panel:"panelItin"},
   {k:"todos",tab:"viewTodos",panel:"panelTodos"},
@@ -782,15 +960,16 @@ VIEWS.forEach(function(v){
   $(v.tab).addEventListener("click",function(){ switchView(v.k); });
 });
 function switchView(which){
+  currentView=which;
   VIEWS.forEach(function(v){
     var on=v.k===which;
     $(v.tab).setAttribute("aria-selected",on?"true":"false");
     $(v.panel).hidden=!on;
   });
-  $("daySel").hidden = which!=="itin";
+  $("daySel").classList.toggle("is-idle", which!=="itin");
 }
 
-function renderAll(){ renderDaySelect(); renderGrid(); renderFilters(); renderSpots(); renderTodos(); renderTasks(); renderPacking(); }
+function renderAll(){ renderDaySelect(); renderGrid(); renderFilters(); renderSpots(); renderTodos(); renderTaskFilter(); renderTasks(); renderPackFilter(); renderPacking(); }
 function scrollToDay(){
   var list=eventsOf(activeDay), anchor=540;
   if(list.length) anchor=list.reduce(function(a,b){ return a.start<b.start?a:b; }).start;

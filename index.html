@@ -9,8 +9,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="釜山行程">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="icon" href="icon-192.png?v=10" sizes="192x192">
-<link rel="apple-touch-icon" href="icon-192.png?v=10">
+<link rel="icon" href="icon-192.png?v=13" sizes="192x192">
+<link rel="apple-touch-icon" href="icon-192.png?v=13">
 <title>2026 Busan Trip</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -34,6 +34,7 @@ if ('serviceWorker' in navigator) {
     <div class="wordmark">
       <b>釜山</b><span>Busan</span>
     </div>
+    <div class="masthead__art" aria-hidden="true"><i></i></div>
     <div class="mast-meta">
       <dl class="meta"><dt>日期</dt><dd>10.09 – 10.14 <em id="countdown"></em></dd></dl>
       <dl class="meta"><dt>去程</dt><dd>TPE 16:40 → PUS 19:55</dd></dl>
@@ -41,20 +42,9 @@ if ('serviceWorker' in navigator) {
     </div>
   </div>
   <svg class="waves" viewBox="0 0 1440 88" preserveAspectRatio="none" aria-hidden="true">
-    <g class="bridge" opacity=".34" fill="none" stroke="#9ED8D8">
-      <path d="M420 44 L880 44" stroke-width="1.6"/>
-      <path d="M560 44 L560 6 M740 44 L740 6" stroke-width="1.6"/>
-      <path d="M420 34 Q560 6 650 30 Q740 6 880 34" stroke-width="1.1"/>
-      <path d="M470 44 L470 20 M515 44 L515 14 M605 44 L605 15 M650 44 L650 30 M695 44 L695 15 M785 44 L785 14 M830 44 L830 20" stroke-width=".7"/>
-    </g>
-    <g class="bridge" opacity=".5" fill="#BDE7E6">
-      <circle cx="470" cy="47" r="1.3"/><circle cx="515" cy="47" r="1.3"/><circle cx="560" cy="47" r="1.3"/>
-      <circle cx="605" cy="47" r="1.3"/><circle cx="650" cy="47" r="1.3"/><circle cx="695" cy="47" r="1.3"/>
-      <circle cx="740" cy="47" r="1.3"/><circle cx="785" cy="47" r="1.3"/><circle cx="830" cy="47" r="1.3"/>
-    </g>
-    <path d="M0 52 C 180 30, 330 74, 520 56 C 700 39, 860 76, 1040 58 C 1210 41, 1330 68, 1440 54 L1440 88 L0 88 Z" fill="#0B4E63" opacity=".55"/>
-    <path d="M0 64 C 200 44, 340 84, 540 68 C 730 53, 900 88, 1090 70 C 1250 55, 1350 76, 1440 66 L1440 88 L0 88 Z" fill="#0E6E82" opacity=".7"/>
-    <path d="M0 76 C 210 62, 380 92, 580 78 C 780 64, 930 94, 1130 80 C 1290 69, 1370 84, 1440 78 L1440 88 L0 88 Z" fill="#EDF3F4"/>
+    <path d="M0 52 C 180 30, 330 74, 520 56 C 700 39, 860 76, 1040 58 C 1210 41, 1330 68, 1440 54 L1440 88 L0 88 Z" fill="#0B4E63" opacity=".4"/>
+    <path d="M0 64 C 200 44, 340 84, 540 68 C 730 53, 900 88, 1090 70 C 1250 55, 1350 76, 1440 66 L1440 88 L0 88 Z" fill="#0E6E82" opacity=".55"/>
+    <path class="waves__haze" d="M0 76 C 210 62, 380 92, 580 78 C 780 64, 930 94, 1130 80 C 1290 69, 1370 84, 1440 78 L1440 88 L0 88 Z"/>
   </svg>
 </header>
 
@@ -120,7 +110,8 @@ if ('serviceWorker' in navigator) {
       <div class="chart__sub">出發前要辦的準備工作</div>
     </div></div>
     <div class="listwrap">
-      <div class="todos" id="tasks"></div>
+      <div class="filters" id="taskWhoFilter" role="tablist" aria-label="依人員篩選"></div>
+      <div class="taskgrid" id="tasks"></div>
       <button class="btn" id="addTask">＋ 新增代辦</button>
     </div>
   </section>
@@ -131,7 +122,8 @@ if ('serviceWorker' in navigator) {
       <div class="chart__sub">行李打包清單</div>
     </div></div>
     <div class="listwrap">
-      <div class="todos" id="packing"></div>
+      <div class="filters" id="packWhoFilter" role="tablist" aria-label="依人員篩選"></div>
+      <div class="packgrid" id="packing"></div>
       <button class="btn" id="addPack">＋ 新增物品</button>
     </div>
   </section>
