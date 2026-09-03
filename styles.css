@@ -359,7 +359,9 @@ input,textarea,select{font:inherit;color:inherit}
   .masthead__inner{padding-bottom:26px;gap:14px}
   .waves{height:58px}
   .app{padding:14px 16px 48px}
-  .masthead__art{display:none}
+  /* 手機:線稿一樣要出現(排在「釜山」右邊那塊空位),只是縮小一點 */
+  .masthead__art{max-width:none;min-width:74px}
+  .masthead__art>i{height:36px;max-width:none;margin-bottom:2px;opacity:.5}
   .mast-meta{margin-left:0;width:100%;display:grid;grid-template-columns:1fr 1fr;gap:12px 16px}
   .mast-meta .meta:first-child{grid-column:1 / -1}
   .meta dd{font-size:12px}
