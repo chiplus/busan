@@ -31,8 +31,7 @@ styles.css            全部樣式
 manifest.webmanifest  PWA 設定
 icon-192.png / icon-512.png   圖示
 masthead-gwangan.webp / 廣安里-線條稿線.png   頁首線稿
-sw.js                 Service Worker(目前 index.html 裡有一段會主動反註冊,
-                      等同停用;要恢復離線功能得先把那段拿掉)
+sw.js                 Service Worker:離線快取 + 繞過 HTTP 快取
 .nojekyll             叫 GitHub Pages 不要跑 Jekyll
 README.md             給人看的說明
 ```
@@ -112,6 +111,15 @@ git push
 
 不要把顏色只寫在 media query 或 `[data-theme]` 區塊裡,那樣在「跟隨系統」的狀態下會套不到。
 
+## 離線與快取(sw.js)
+
+- **本站檔案:網路優先,而且用 `cache:"reload"` 繞過 HTTP 快取。** 有網路一定拿最新的,順手存快取;沒網路才吃快取。這是為了根治「改了程式碼但網頁是舊的」。
+- **Supabase 的請求完全不攔**(POST,而且必須即時)。`sw.js` 的 fetch handler 會直接 return 放行。
+- **Google Fonts:快取優先、背景更新**,離線時字型才不會掉。
+- 改版時把 `sw.js` 最上面的 `VERSION` 換一個新值(用日期),舊快取會在 activate 時自動清掉。
+- `index.html` 裡的註冊程式偵測到新版 SW 時,右下角會出現「有新版本 · 點一下更新」按鈕,按了會 `SKIP_WAITING` 並自動重新載入。
+- **`PRECACHE` 陣列裡的網址要跟 `index.html` / `styles.css` 裡寫的一模一樣**(含 `?v=11`、`?v=13` 這種查詢字串),否則離線時對不上。改了圖片版號記得同步改這裡。
+
 ## 跨裝置同步(sync.js)
 
 行程整包當成一筆 JSON 存在 Supabase 的 `plans` 資料表。「同步碼」是隨機字串,等於這份行程的鑰匙;三台裝置填同一組就共用同一份。
@@ -120,6 +128,7 @@ git push
 - 每 20 秒、以及視窗重新取得焦點時,向雲端拉一次;`rev`(毫秒時間戳)較新才覆蓋本機
 - 衝突是**後寫的贏**,整包覆蓋,沒有欄位級合併
 - 沒填設定或連不上時全部降級成純 localStorage,不會壞
+- **離線處理**:`dirty` 旗標記著「有改動還沒上傳」。離線時只存本機並顯示「離線中 · 改動已存本機」;`online` 事件、每次輪詢與視窗取得焦點時都會檢查 `dirty`,有欠的就補傳
 
 資料表與兩個 RPC 函式的 SQL 在 `README.md` 的「跨裝置同步」那節。**RLS 全關(沒有任何 policy),所有存取只能走 `get_plan` / `save_plan` 兩個 SECURITY DEFINER 函式**,所以光有 publishable key 無法列舉別人的行程。改動這塊時不要為了方便去開資料表的 policy。
 

@@ -402,3 +402,11 @@ input,textarea,select{font:inherit;color:inherit}
   border-color:color-mix(in srgb,var(--persimmon) 40%,var(--line))}
 .syncbox__or{text-align:center;font-size:11.5px;letter-spacing:.14em;color:var(--text-3);
   text-transform:uppercase}
+
+/* ---------- 有新版本的提示(sw.js) ---------- */
+.swupdate{position:fixed;right:16px;bottom:16px;z-index:95;
+  padding:10px 16px;border-radius:999px;border:1px solid var(--brine);
+  background:var(--brine);color:#fff;font:inherit;font-size:13px;font-weight:500;
+  cursor:pointer;box-shadow:0 8px 24px rgba(8,40,60,.28)}
+.swupdate:hover{background:var(--brine-lift);border-color:var(--brine-lift)}
+@media (max-width:640px){ .swupdate{left:16px;right:16px;text-align:center} }

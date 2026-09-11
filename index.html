@@ -17,13 +17,37 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=DM+Sans:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700&display=swap">
 <link rel="stylesheet" href="styles.css">
 <script>
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then(registrations => {
-    registrations.forEach(reg => reg.unregister());
+/* 註冊 Service Worker → 離線也打得開。
+   快取策略在 sw.js:有網路一律拿最新的,沒網路才吃快取。
+   偵測到新版本時,右下角會冒出一顆「有新版本」的按鈕讓你重新載入。 */
+if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('sw.js').then(function (reg) {
+      reg.addEventListener('updatefound', function () {
+        var sw = reg.installing;
+        if (!sw) return;
+        sw.addEventListener('statechange', function () {
+          if (sw.state === 'installed' && navigator.serviceWorker.controller) showUpdate(sw);
+        });
+      });
+    }).catch(function () {});
+
+    var reloading = false;
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+      if (reloading) return;
+      reloading = true;
+      location.reload();
+    });
   });
-  caches.keys().then(names => {
-    names.forEach(name => caches.delete(name));
-  });
+}
+function showUpdate(sw) {
+  if (document.getElementById('swUpdate')) return;
+  var b = document.createElement('button');
+  b.id = 'swUpdate';
+  b.className = 'swupdate';
+  b.textContent = '有新版本 · 點一下更新';
+  b.addEventListener('click', function () { sw.postMessage('SKIP_WAITING'); });
+  document.body.appendChild(b);
 }
 </script>
 </head>

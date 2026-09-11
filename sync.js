@@ -36,6 +36,8 @@ var hooks = null;
 var syncKey = null;
 var pushTimer = null, pollTimer = null;
 var pushing = false, lastRemoteRev = 0;
+var dirty = false;          /* 有改動還沒成功上傳(離線或失敗時會是 true) */
+var wiredNet = false;
 
 /* ---------- 基本工具 ---------- */
 
@@ -86,6 +88,7 @@ function rpc(fn, body){
 
 function pull(silent){
   if(!syncKey || !configured()) return Promise.resolve(null);
+  if(navigator.onLine === false){ offlineNote(); return Promise.resolve(null); }
   return rpc("get_plan", {p_id: syncKey}).then(function(rows){
     var row = (rows && rows.length) ? rows[0] : null;
     if(!row || !row.data) return null;
@@ -108,14 +111,35 @@ function pushNow(){
   if(!syncKey || !configured() || pushing) return Promise.resolve();
   var st = hooks.getState();
   if(!st) return Promise.resolve();          // 正在看分享的行程,不要上傳
+  if(navigator.onLine === false){ dirty = true; offlineNote(); return Promise.resolve(); }
   pushing = true;
   note("busy","同步中…");
   return rpc("save_plan", {p_id: syncKey, p_data: st}).then(function(){
     lastRemoteRev = st.rev || 0;
+    dirty = false;
     note("ok","已同步 · " + stamp());
   }).catch(function(err){
-    note("","同步失敗,已存在本機(" + err.message + ")");
+    dirty = true;                            /* 記著,等網路回來再補傳 */
+    if(navigator.onLine === false) offlineNote();
+    else note("","同步失敗,已存在本機(" + err.message + ")");
   }).then(function(){ pushing = false; });
+}
+
+function offlineNote(){
+  note("busy", dirty ? "離線中 · 改動已存本機,連上網路會自動補傳"
+                     : "離線中 · 目前是這台的最新版本");
+}
+
+/* 網路斷掉/回來時的處理:回來就先拉一次,有欠的再補傳。 */
+function wireNetwork(){
+  if(wiredNet) return;
+  wiredNet = true;
+  window.addEventListener("offline", function(){ offlineNote(); });
+  window.addEventListener("online", function(){
+    if(!syncKey) return;
+    note("busy","網路回來了,同步中…");
+    pull(true).then(function(){ if(dirty) return pushNow(); });
+  });
 }
 
 /* ---------- 對外 API ---------- */
@@ -131,12 +155,15 @@ export function init(opts){
     note("","自動存在這個瀏覽器 · 按「同步」可開啟跨裝置");
     return;
   }
+  wireNetwork();
+  if(navigator.onLine === false){ offlineNote(); start(); return; }
   note("busy","連線中…");
   pull(true).then(function(){ start(); });
 }
 
 export function notifyChange(){
   if(!syncKey || !configured()) return;
+  dirty = true;
   clearTimeout(pushTimer);
   pushTimer = setTimeout(pushNow, PUSH_DEBOUNCE_MS);
 }
@@ -145,9 +172,13 @@ function start(){
   clearInterval(pollTimer);
   pollTimer = setInterval(function(){
     if(document.hidden) return;
-    pull(true);
+    if(navigator.onLine === false) return;
+    pull(true).then(function(){ if(dirty) return pushNow(); });
   }, POLL_MS);
-  window.addEventListener("focus", function(){ if(syncKey) pull(true); });
+  window.addEventListener("focus", function(){
+    if(!syncKey || navigator.onLine === false) return;
+    pull(true).then(function(){ if(dirty) return pushNow(); });
+  });
 }
 
 function stop(){
@@ -204,6 +235,7 @@ function paint(card){
 
     var b1 = h("button","syncbox__btn syncbox__btn--go","在這台建立同步(用目前的行程)");
     b1.addEventListener("click", function(){
+      wireNetwork();
       syncKey = makeKey(); storeKey(syncKey);
       b1.disabled = true; b1.textContent = "建立中…";
       pushNow().then(function(){ start(); paint(card); say("同步已開啟"); });
@@ -228,7 +260,7 @@ function paint(card){
         var row = (rows && rows.length) ? rows[0] : null;
         if(!row || !row.data) throw new Error("找不到這組同步碼的行程");
         if(!hooks.applyState(row.data)) throw new Error("雲端資料格式不對");
-        storeKey(k); start(); paint(card);
+        storeKey(k); wireNetwork(); start(); paint(card);
         note("ok","已連線 · " + stamp());
         say("已載入雲端行程");
       }).catch(function(err){
