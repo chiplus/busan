@@ -98,3 +98,110 @@ python3 -m http.server 8000
 ```
 
 改 CSS / 資料存檔後,回瀏覽器按 Ctrl+Shift+R 強制重整(避開 Service Worker 舊快取),或開無痕視窗。
+
+## 跨裝置同步(Supabase)
+
+行程預設只存在瀏覽器裡,三台裝置各看各的。要讓手機、桌機、筆電共用同一份,照下面做一次,之後就自動了。
+
+### 1. 建立 Supabase 專案
+
+1. 到 <https://supabase.com> 用 GitHub 帳號登入(免費方案就夠)
+2. **New project** → 名稱填 `busan` → 設一組資料庫密碼(用不到,但要填)→ Region 選 **Northeast Asia (Tokyo)** → Create
+3. 等一兩分鐘讓它建好
+
+### 2. 建資料表與兩個函式
+
+左側選單 **SQL Editor** → **New query** → 把下面整段貼進去 → 按 **Run**:
+
+```sql
+-- 行程表:一筆 = 一份行程,id 就是同步碼
+create table if not exists public.plans (
+  id          text primary key,
+  data        jsonb       not null,
+  updated_at  timestamptz not null default now()
+);
+
+-- 全開 RLS 且不建任何 policy = 誰都不能直接讀寫這張表
+alter table public.plans enable row level security;
+
+-- 只有這兩個函式進得去,而且都必須提供同步碼
+create or replace function public.get_plan(p_id text)
+returns setof public.plans
+language sql security definer set search_path = public as $$
+  select * from public.plans where id = p_id;
+$$;
+
+create or replace function public.save_plan(p_id text, p_data jsonb)
+returns timestamptz
+language plpgsql security definer set search_path = public as $$
+declare ts timestamptz;
+begin
+  insert into public.plans (id, data, updated_at)
+  values (p_id, p_data, now())
+  on conflict (id) do update
+    set data = excluded.data, updated_at = now()
+  returning updated_at into ts;
+  return ts;
+end $$;
+
+revoke all on function public.get_plan(text)          from public;
+revoke all on function public.save_plan(text, jsonb)  from public;
+grant execute on function public.get_plan(text)         to anon;
+grant execute on function public.save_plan(text, jsonb) to anon;
+```
+
+看到 `Success. No rows returned` 就對了。
+
+**為什麼這樣寫**:資料表的 RLS 開著又沒有任何 policy,等於直接查表一定查不到東西。唯一的入口是那兩個 `security definer` 函式,而它們都要求你給出同步碼。所以就算有人從公開的原始碼撈到金鑰,也沒辦法把所有行程列出來——他得先猜中那串 16 個字元的隨機碼。
+
+### 3. 把金鑰填進 sync.js
+
+左側 **Settings → API Keys**,複製兩個值:
+
+| 欄位 | 長相 | 填到 `sync.js` 的 |
+|---|---|---|
+| Project URL | `https://xxxxxxxx.supabase.co` | `SUPABASE_URL` |
+| Publishable key | `sb_publishable_...` | `SUPABASE_KEY` |
+
+打開 `sync.js`,最上面設定區那兩行改成:
+
+```js
+var SUPABASE_URL = "https://你的專案.supabase.co";
+var SUPABASE_KEY = "sb_publishable_你的金鑰";
+```
+
+**只能用 publishable key,絕對不要貼 secret key**(`sb_secret_` 開頭)。publishable key 本來就設計成可以放在前端公開,擋人的是上面的 RLS 設計和你的同步碼;secret key 會繞過所有防線。
+
+存檔,推上去:
+
+```bash
+git add sync.js
+git commit -m "接上 Supabase 同步"
+git push
+```
+
+### 4. 三台裝置連起來
+
+等一分鐘部署完成,然後:
+
+**第一台**(資料最完整的那台)
+
+1. 開網站,按工具列的「**同步**」
+2. 按「**在這台建立同步(用目前的行程)**」
+3. 出現一組像 `cridi5bk-6ocoag2u` 的同步碼,按「複製同步碼」
+
+**另外兩台**
+
+1. 開網站 → 「同步」
+2. 把同步碼貼進輸入框 → 按「**用同步碼連線**」
+3. 這台原本的行程會被雲端那份取代。捨不得的話先按「匯出」備份
+
+連好之後,任何一台改動 1.5 秒後自動上傳,其他裝置每 20 秒、或切回視窗時自動抓下來。側欄會顯示「已同步 · 時間」。
+
+### 注意事項
+
+- **衝突是後寫的贏**,整包覆蓋。兩台同時大改同一天的行程,晚存的那台會蓋掉先存的。一次在一台改比較保險。
+- **同步碼就是密碼**,拿到的人就看得到也改得動這份行程。不要貼到公開的地方。
+- **忘記同步碼**:在還連著的那台按「同步」就看得到。三台都斷了的話,到 Supabase 後台 **Table Editor → plans** 看 `id` 欄位。
+- **想退回**:按「在這台停用同步」,這台就變回只存本機,雲端那份不會被刪,之後還能用同步碼接回來。
+- 免費方案的資料庫閒置一段時間會被暫停,再開網站時第一次同步可能要多等幾秒。

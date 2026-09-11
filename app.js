@@ -9,6 +9,7 @@ import {
   CATS, CAT_ORDER, DAYS,
   SEED_SPOTS, SEED_EVENTS, SEED_TODOS, SEED_TASKS, SEED_PACKING
 } from "./data.js";
+import * as Sync from "./sync.js";
 
 /* ============ state ============ */
 var CLIENT=Math.random().toString(36).slice(2,10);
@@ -60,8 +61,21 @@ function persist(){
   }catch(e){
     setSync("","存不進瀏覽器(可能是無痕模式),建議先匯出備份");
   }
+  Sync.notifyChange();          /* 有開雲端同步的話,1.5 秒後自動上傳 */
 }
 setSync("ok","自動存在這個瀏覽器");
+
+/* 把雲端拉下來的一份行程換進來(sync.js 會呼叫)。回傳 false 代表格式不對。 */
+function adoptState(p){
+  if(!p||!Array.isArray(p.spots)||!Array.isArray(p.events)) return false;
+  if(!Array.isArray(p.todos)) p.todos=[];
+  if(!Array.isArray(p.tasks)) p.tasks=[];
+  if(!Array.isArray(p.packing)) p.packing=[];
+  state=p; viewingShared=false; myBackup=null; hideBanner();
+  try{ localStorage.setItem(LS,JSON.stringify(state)); }catch(e){}
+  renderAll();
+  return true;
+}
 
 /* ---- theme ---- */
 var THEME_KEY="busan-tide-theme", themeModes=["system","light","dark"];
@@ -993,3 +1007,12 @@ function scrollToDay(){
 /* 重整後回到原本那個分頁(行程表/待確認/代辦/要帶);沒存過或值不對就照舊預設行程表。 */
 var initialView=(uiState&&VIEWS.some(function(v){return v.k===uiState.view;}))?uiState.view:"itin";
 renderAll(); switchView(initialView); scrollToDay();
+
+/* ============ 跨裝置同步 ============ */
+document.getElementById("btnSync").addEventListener("click",function(){ Sync.openPanel(); });
+Sync.init({
+  getState:   function(){ return viewingShared ? null : state; },
+  applyState: adoptState,
+  setStatus:  setSync,
+  toast:      toast
+});
