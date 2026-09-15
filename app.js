@@ -553,22 +553,43 @@ function renderTasks(){
 
 /* ============ packing(要帶):卡片版,依名稱自動猜一個對應的 icon ============ */
 var PACK_ICON_RULES=[
-  [/護照|簽證|證件照|入境|海關/,"🛂"],
-  [/現金|信用卡|提款卡|韓元|錢包/,"💳"],
-  [/轉接頭|插座|充電器|傳輸線|插頭/,"🔌"],
-  [/行動電源|電池/,"🔋"],
-  [/藥|ok繃|OK繃|暈車|腸胃|感冒|止痛/i,"💊"],
-  [/防曬|保養|乳液|面膜|修護|化妝/,"🧴"],
-  [/泳衣|泳褲|外套|衣服|褲|襪子/,"👕"],
-  [/鞋/,"👟"],
-  [/雨具|雨傘|雨衣/,"☂️"],
-  [/購物袋|環保袋|袋子/,"🛍️"],
-  [/相機|自拍棒|腳架|底片/,"📷"],
-  [/耳機/,"🎧"],
-  [/眼鏡/,"🕶️"],
-  [/毛巾|盥洗|牙刷|牙膏|洗面乳/,"🧼"],
-  [/文件|資料|列印|訂房|機票|保單/,"📄"],
-  [/手機|行動網路|esim|eSIM|wifi|WiFi|SIM/,"📶"]
+  [/護照|簽證|證件照|入境|海關|台胞證|身分證|駕照/,"🛂"],
+  [/現金|信用卡|提款卡|韓元|韓幣|零錢|旅支/,"💳"],
+  [/錢包|皮夾|零錢包/,"👛"],
+  [/T-?money|交通卡|一卡通|地鐵|捷運卡|悠遊卡/i,"🚇"],
+  [/延長線|轉接頭|轉接|插座|插頭|萬國/,"🔌"],
+  [/充電器|充電線|傳輸線|充電頭|usb|USB/,"🔌"],
+  [/行動電源|行充|電池/,"🔋"],
+  [/藥|ok繃|OK繃|暈車|腸胃|感冒|止痛|過敏|胃散|退燒|防蚊/i,"💊"],
+  [/口罩/,"😷"],
+  [/暖暖包/,"♨️"],
+  [/防曬|保養|乳液|面膜|修護|化妝|粉底|口紅|護唇|護手/,"🧴"],
+  [/隱形眼鏡|眼藥水|保養液/,"👁️"],
+  [/帽子|帽/,"🧢"],
+  [/圍巾|手套/,"🧣"],
+  [/泳衣|泳褲|外套|衣服|上衣|褲|襪|內衣|內褲|睡衣|發熱衣|羽絨|保暖/,"👕"],
+  [/鞋|拖鞋|涼鞋/,"👟"],
+  [/雨具|雨傘|雨衣|折傘|摺傘/,"☂️"],
+  [/化妝包|盥洗包/,"💄"],
+  [/後背包|背包|斜背包|側背包|手提包|書包|包包|腰包|小包/,"🎒"],
+  [/行李箱|行李|登機箱|托運|旅行箱/,"🧳"],
+  [/購物袋|環保袋|袋子|提袋/,"🛍️"],
+  [/相機|自拍棒|腳架|底片|gopro/i,"📷"],
+  [/耳機|airpods|耳塞/i,"🎧"],
+  [/墨鏡|太陽眼鏡|眼鏡/,"🕶️"],
+  [/毛巾|盥洗|牙刷|牙膏|洗面乳|洗髮|沐浴|刮鬍|棉花棒|指甲刀/,"🧼"],
+  [/濕紙巾|衛生紙|面紙|衛生棉/,"🧻"],
+  [/水瓶|水壺|保溫瓶|保溫杯/,"💧"],
+  [/零食|餅乾|泡麵|咖啡|茶包|巧克力/,"🍫"],
+  [/筆電|平板|ipad|電腦|滑鼠/i,"💻"],
+  [/耳溫槍|體溫計/,"🌡️"],
+  [/頸枕|眼罩/,"🛌"],
+  [/鑰匙|鎖/,"🔑"],
+  [/筆|記事本|便條/,"🖊️"],
+  [/書|雜誌/,"📖"],
+  [/手錶/,"⌚"],
+  [/文件|資料|列印|訂房|機票|保單|訂單|行程表/,"📄"],
+  [/手機|行動網路|esim|eSIM|wifi|WiFi|SIM|漫遊|網路卡/,"📶"]
 ];
 function guessPackIcon(text){
   text=text||"";
@@ -590,11 +611,13 @@ function renderPacking(){
     var card=el("div","packcard"+(t.done?" done":""));
 
     var top=el("div","packcard__top");
-    top.appendChild(el("span","packcard__icon",guessPackIcon(t.text)));
+    var icon=el("span","packcard__icon",guessPackIcon(t.text));
+    top.appendChild(icon);
     var cb=document.createElement("input"); cb.type="checkbox"; cb.checked=!!t.done;
     cb.addEventListener("change",function(){ t.done=cb.checked; persist(); renderPacking(); });
     top.appendChild(cb);
     var name=el("div","packcard__name",t.text); name.contentEditable="true"; name.spellcheck=false;
+    name.addEventListener("input",function(){ icon.textContent=guessPackIcon(name.textContent); });
     name.addEventListener("blur",function(){ t.text=name.textContent.trim()||t.text; persist(); renderPacking(); });
     top.appendChild(name);
     var del=el("button","mini","✕"); del.title="刪除";
@@ -797,15 +820,20 @@ function spotEditor(s,onChange){
   frag.appendChild(field("分類",cat));
 
   var url=document.createElement("input"); url.value=s.url||"";
-  url.placeholder="貼 Naver 或 Google 地圖網址";
+  url.placeholder="貼 Naver 地圖網址";
+  var url2=document.createElement("input"); url2.value=s.url2||"";
+  url2.placeholder="貼 Google 地圖網址(選填)";
   var linkSlot=el("div");
   function paintLink(){
     linkSlot.innerHTML="";
-    var b=mapButton(s.url); if(b) linkSlot.appendChild(b);
-    else linkSlot.appendChild(el("div","mini","尚未加入網址"));
+    var b1=mapButton(s.url); if(b1) linkSlot.appendChild(b1);
+    var b2=mapButton(s.url2); if(b2) linkSlot.appendChild(b2);
+    if(!b1&&!b2) linkSlot.appendChild(el("div","mini","尚未加入網址"));
   }
   url.addEventListener("input",function(){ s.url=url.value.trim(); onChange(); paintLink(); });
-  frag.appendChild(field("地圖網址",url));
+  url2.addEventListener("input",function(){ s.url2=url2.value.trim(); onChange(); paintLink(); });
+  frag.appendChild(field("Naver 地圖網址",url));
+  frag.appendChild(field("Google 地圖網址",url2));
   paintLink();
   frag.appendChild(linkSlot);
 
@@ -920,7 +948,7 @@ function openSpotSheet(spotId){
 }
 
 function openNewSheet(start){
-  var s={id:uid("s"),name:"",ko:"",cat:"sight",url:"",notes:""};
+  var s={id:uid("s"),name:"",ko:"",cat:"sight",url:"",url2:"",notes:""};
   sheet.innerHTML="";
   var head=el("div","sheet__head"); head.style.setProperty("--cat",catVar("sight"));
   head.appendChild(el("div","sheet__eyebrow")).appendChild(el("span","mini","新增景點"));
