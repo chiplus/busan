@@ -7,7 +7,7 @@
    · SEED_SPOTS … 景點櫃預設清單
    · SEED_EVENTS … 預設排入時間軸的行程(用 ev() 產生)
    · SEED_TODOS … 「待確認」清單    · SEED_TASKS … 「代辦」清單
-   · SEED_PACKING … 「要帶」清單
+   · SEED_PACKING … 「要帶」清單    · SEED_SHOPPING … 「逛街」的地區分類
    改完存檔、重新整理即可。使用者若已在瀏覽器存過自己的版本,
    要按側欄「回復預設行程」才會吃到新的預設值。
    ============================================================ */
@@ -173,6 +173,16 @@ var SEED_PACKING=[
  {id:"p9",text:"環保購物袋、輕便雨具",done:false,who:[]}
 ];
 
+/* 逛街:依地區分類的店家清單。shops 裡每家店是 {id, name, url, note}。
+   分類跟店家都能在頁面上新增、改名、刪除,這裡只是一開始的幾個地區。 */
+var SEED_SHOPPING=[
+ {id:"area_haeundae",name:"海雲台",shops:[]},
+ {id:"area_gwangalli",name:"廣安里",shops:[]},
+ {id:"area_seomyeon",name:"西面",shops:[]},
+ {id:"area_nampo",name:"南浦洞",shops:[]}
+];
+
 export {
-  DAY_START, DAY_END, SNAP, PPM, GRID_H, CATS, CAT_ORDER, DAYS, SEED_SPOTS, SEED_EVENTS, SEED_TODOS, SEED_TASKS, SEED_PACKING
+  DAY_START, DAY_END, SNAP, PPM, GRID_H, CATS, CAT_ORDER, DAYS, SEED_SPOTS, SEED_EVENTS, SEED_TODOS, SEED_TASKS, SEED_PACKING,
+  SEED_SHOPPING
 };

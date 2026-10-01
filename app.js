@@ -7,7 +7,7 @@
 import {
   DAY_START, DAY_END, SNAP, PPM, GRID_H,
   CATS, CAT_ORDER, DAYS,
-  SEED_SPOTS, SEED_EVENTS, SEED_TODOS, SEED_TASKS, SEED_PACKING
+  SEED_SPOTS, SEED_EVENTS, SEED_TODOS, SEED_TASKS, SEED_PACKING, SEED_SHOPPING
 } from "./data.js";
 import * as Sync from "./sync.js";
 
@@ -24,7 +24,7 @@ function loadUiState(){
 }
 function saveUiState(){
   try{
-    localStorage.setItem(UI_KEY,JSON.stringify({view:currentView,day:activeDay,taskFilter:taskFilter,packFilter:packFilter}));
+    localStorage.setItem(UI_KEY,JSON.stringify({view:currentView,day:activeDay,taskFilter:taskFilter,packFilter:packFilter,shopFilter:shopFilter}));
   }catch(e){}
 }
 var uiState=loadUiState();
@@ -35,6 +35,8 @@ function seed(){
           todos:JSON.parse(JSON.stringify(SEED_TODOS)),
           tasks:JSON.parse(JSON.stringify(SEED_TASKS)),
           packing:JSON.parse(JSON.stringify(SEED_PACKING)),
+          outfits:{},
+          shopping:JSON.parse(JSON.stringify(SEED_SHOPPING)),
           rev:Date.now(),client:CLIENT};
 }
 function loadLocal(){
@@ -45,6 +47,8 @@ state=loadLocal()||seed();
 if(!state.todos) state.todos=JSON.parse(JSON.stringify(SEED_TODOS));
 if(!state.tasks) state.tasks=JSON.parse(JSON.stringify(SEED_TASKS));
 if(!state.packing) state.packing=JSON.parse(JSON.stringify(SEED_PACKING));
+if(!state.outfits||typeof state.outfits!=="object") state.outfits={};
+if(!Array.isArray(state.shopping)) state.shopping=JSON.parse(JSON.stringify(SEED_SHOPPING));
 if(uiState&&uiState.day&&DAYS.some(function(d){return d.id===uiState.day;})) activeDay=uiState.day;
 
 /* ============ storage ============ */
@@ -71,6 +75,8 @@ function adoptState(p){
   if(!Array.isArray(p.todos)) p.todos=[];
   if(!Array.isArray(p.tasks)) p.tasks=[];
   if(!Array.isArray(p.packing)) p.packing=[];
+  if(!p.outfits||typeof p.outfits!=="object") p.outfits=state.outfits||{};
+  if(!Array.isArray(p.shopping)) p.shopping=state.shopping||[];
   state=p; viewingShared=false; myBackup=null; hideBanner();
   try{ localStorage.setItem(LS,JSON.stringify(state)); }catch(e){}
   renderAll();
@@ -101,7 +107,11 @@ function stamp(){
   return d.getFullYear()+z(d.getMonth()+1)+z(d.getDate())+"-"+z(d.getHours())+z(d.getMinutes());
 }
 document.getElementById("btnExport").addEventListener("click",function(){
-  var blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"});
+  /* 穿搭照片不在 state 裡(另外存),匯出時一起包進去,備份才完整 */
+  var out=JSON.parse(JSON.stringify(state)), pics={};
+  Object.keys(state.outfits||{}).forEach(function(k){ if(photos[k]&&photos[k].img) pics[k]=photos[k].img; });
+  if(Object.keys(pics).length) out.outfitPhotos=pics;
+  var blob=new Blob([JSON.stringify(out,null,2)],{type:"application/json"});
   var a=document.createElement("a");
   a.href=URL.createObjectURL(blob); a.download="busan-plan-"+stamp()+".json";
   document.body.appendChild(a); a.click();
@@ -120,6 +130,9 @@ fileIn.addEventListener("change",function(){
       if(!Array.isArray(p.todos)) p.todos=[];
       if(!Array.isArray(p.tasks)) p.tasks=[];
       if(!Array.isArray(p.packing)) p.packing=[];
+      if(!p.outfits||typeof p.outfits!=="object") p.outfits=state.outfits||{};
+      if(!Array.isArray(p.shopping)) p.shopping=state.shopping||[];
+      if(p.outfitPhotos) importPhotos(p);
       state=p; viewingShared=false; hideBanner(); persist(); renderAll();
       toast("已匯入 "+p.spots.length+" 個景點、"+p.events.length+" 段行程");
     }catch(err){ toast("這個檔案讀不出來:"+err.message); }
@@ -165,7 +178,8 @@ function decodeState(code){
   return Promise.resolve(JSON.parse(new TextDecoder().decode(bytes)));
 }
 document.getElementById("btnShare").addEventListener("click",function(){
-  encodeState(state).then(function(code){
+  var shared=JSON.parse(JSON.stringify(state)); delete shared.outfits;   /* 照片不跟著分享網址走 */
+  encodeState(shared).then(function(code){
     var url=location.origin+location.pathname+"#p="+code;
     if(url.length>60000){ toast("行程太大,分享網址塞不下,請改用「匯出」給檔案"); return; }
     var done=function(){ toast("分享網址已複製,長度 "+url.length+" 字元"); };
@@ -206,6 +220,8 @@ document.getElementById("bannerDrop").addEventListener("click",function(){
     if(!Array.isArray(p.todos)) p.todos=[];
     if(!Array.isArray(p.tasks)) p.tasks=[];
     if(!Array.isArray(p.packing)) p.packing=[];
+    p.outfits=state.outfits||{};
+    if(!Array.isArray(p.shopping)) p.shopping=[];
     myBackup=state; state=p; viewingShared=true;
     showBanner("你正在看別人分享的行程,改動不會自動存起來。");
     setSync("busy","分享檢視");
@@ -336,7 +352,14 @@ function evNode(e,pos){
   if(drag&&drag.moved&&drag.id===e.id) n.classList.add("dragging");
   n.appendChild(el("div","ev__t",fmt(e.start)+"–"+fmt(e.start+e.dur)));
   n.appendChild(el("div","ev__n",name));
-  if(e.dur>=90&&e.memo) n.appendChild(el("div","ev__memo",e.memo));
+  /* 當日備註:每種長度都要看得到。短方塊(≤45 分)接在名稱後面單行省略;
+     長一點的依高度給可用行數。滑鼠停著看得到全文。 */
+  if(e.memo){
+    var memo=el("div","ev__memo",e.memo);
+    if(e.dur>45) memo.style.setProperty("-webkit-line-clamp",String(Math.max(1,Math.floor((e.dur*PPM-69)/16.5))));
+    n.appendChild(memo);
+    n.title=name+"\n"+e.memo;
+  }
   var warn=(e.memo&&e.memo.indexOf("⚠")>-1)||(s&&s.notes&&s.notes.indexOf("⚠")>-1);
   if(warn) n.appendChild(el("div","ev__flag"));
   var grip=el("div","ev__grip"); n.appendChild(grip);
@@ -629,6 +652,383 @@ function renderPacking(){
     w.appendChild(card);
   });
 }
+
+/* ============ shopping(逛街):依地區分類,每家店有店名／網址／備註 ============
+   state.shopping=[{id,name,shops:[{id,name,url,note}]}]。
+   打字時只改資料、不重畫(重畫會讓游標跑掉);新增／刪除／搬分類才整個重畫。 */
+var shopFilter=(uiState&&typeof uiState.shopFilter==="string")?uiState.shopFilter:"all";
+function areaOf(id){ for(var i=0;i<state.shopping.length;i++) if(state.shopping[i].id===id) return state.shopping[i]; return null; }
+/* 只讓 http(s) 變成連結;沒寫開頭的(例如 naver.me/xxx)自動補 https:// */
+function cleanUrl(v){
+  v=(v||"").trim();
+  if(v&&!/^[a-z][a-z0-9+.-]*:/i.test(v)) v="https://"+v;
+  return v;
+}
+function isWebUrl(v){ return /^https?:\/\//i.test(v||""); }
+/* 刪除鈕:按第一次變成確認字樣,3 秒內再按才真的刪 */
+function armedButton(cls,label,armedLabel,onConfirm){
+  var b=el("button",cls,label), armed=false; b.type="button";
+  b.addEventListener("click",function(){
+    if(!armed){ armed=true; b.textContent=armedLabel; b.classList.add("armed");
+      setTimeout(function(){ armed=false; b.textContent=label; b.classList.remove("armed"); },3000); return; }
+    onConfirm();
+  });
+  return b;
+}
+
+function renderShopFilter(){
+  var w=$("shopAreaFilter"); w.innerHTML="";
+  if(shopFilter!=="all"&&!areaOf(shopFilter)) shopFilter="all";
+  [{id:"all",name:"全部"}].concat(state.shopping).forEach(function(a){
+    var b=el("button","filt",a.name||"未命名"); b.type="button";
+    b.setAttribute("aria-pressed",shopFilter===a.id?"true":"false");
+    if(a.shops&&a.shops.length) b.appendChild(el("u",null,String(a.shops.length)));
+    b.addEventListener("click",function(){ shopFilter=a.id; renderShopping(); saveUiState(); });
+    w.appendChild(b);
+  });
+}
+function renderShopping(){
+  renderShopFilter();
+  var total=0; state.shopping.forEach(function(a){ total+=a.shops.length; });
+  $("shopCount").textContent=total?String(total):"";
+  var w=$("shopAreas"); w.innerHTML="";
+  if(!state.shopping.length){ w.appendChild(el("div","none","還沒有分類,按下面的「＋ 新增分類」開始")); return; }
+  state.shopping.forEach(function(a){
+    if(shopFilter==="all"||shopFilter===a.id) w.appendChild(shopAreaNode(a));
+  });
+}
+function shopAreaNode(a){
+  var sec=el("section","shoparea");
+  var head=el("div","shoparea__head");
+  var name=document.createElement("input"); name.className="shoparea__name";
+  name.value=a.name||""; name.placeholder="分類名稱,例如:海雲台"; name.setAttribute("aria-label","分類名稱");
+  name.addEventListener("input",function(){ a.name=name.value; persist(); });
+  name.addEventListener("change",function(){ a.name=name.value.trim(); persist(); renderShopFilter(); });
+  head.appendChild(name);
+  head.appendChild(el("span","shoparea__n",a.shops.length+" 家"));
+  head.appendChild(armedButton("mini shoparea__del","刪除分類",
+    a.shops.length?("再按一次(連同 "+a.shops.length+" 家店)"):"再按一次確認",
+    function(){
+      state.shopping=state.shopping.filter(function(x){ return x!==a; });
+      persist(); renderShopping(); toast("已刪除分類");
+    }));
+  sec.appendChild(head);
+
+  var grid=el("div","shopgrid");
+  if(!a.shops.length) grid.appendChild(el("div","shopgrid__none","這區還沒有店家"));
+  a.shops.forEach(function(s){ grid.appendChild(shopCard(a,s)); });
+  sec.appendChild(grid);
+
+  var add=el("button","btn shoparea__add","＋ 新增店家"); add.type="button";
+  add.addEventListener("click",function(){
+    var s={id:uid("shop"),name:"",url:"",note:""};
+    a.shops.push(s); editingShop=s.id; persist(); renderShopping();
+    var n=document.querySelector('[data-shop="'+s.id+'"] .shopcard__name'); if(n) n.focus();
+  });
+  sec.appendChild(add);
+  return sec;
+}
+/* 店家卡片平常是一個小方框:只有店名(點了開地圖)跟備註。
+   按右上角 ✎ 才展開成編輯表單;一次只會有一張在編輯。 */
+var editingShop=null;
+function shopHref(s){
+  if(isWebUrl(s.url)) return s.url;
+  return s.name?("https://map.naver.com/p/search/"+encodeURIComponent(s.name)):null;   /* 沒貼網址 → 用店名搜 Naver 地圖 */
+}
+function shopCard(a,s){
+  return editingShop===s.id ? shopEditor(a,s) : shopBox(a,s);
+}
+function shopBox(a,s){
+  var card=el("div","shopcard shopcard--box"); card.dataset.shop=s.id;
+  var head=el("div","shopcard__head");
+  var href=shopHref(s);
+  var name;
+  if(href){
+    name=document.createElement("a"); name.href=href; name.target="_blank"; name.rel="noopener noreferrer";
+    name.title=isWebUrl(s.url)?"開啟連結":"在 Naver 地圖搜尋這家店";
+  } else name=el("span");
+  name.className="shopcard__link";
+  name.appendChild(el("span",null,s.name||"未命名店家"));
+  if(href) name.appendChild(el("i",null,"↗"));
+  head.appendChild(name);
+  var edit=el("button","shopcard__edit","✎"); edit.type="button"; edit.title="編輯"; edit.setAttribute("aria-label","編輯 "+(s.name||"店家"));
+  edit.addEventListener("click",function(){
+    editingShop=s.id; renderShopping();
+    var n=document.querySelector('[data-shop="'+s.id+'"] .shopcard__name'); if(n) n.focus();
+  });
+  head.appendChild(edit);
+  card.appendChild(head);
+  if(s.note) card.appendChild(el("div","shopcard__text",s.note));
+  return card;
+}
+function shopEditor(a,s){
+  var card=el("div","shopcard shopcard--edit"); card.dataset.shop=s.id;
+
+  var name=document.createElement("input"); name.className="shopcard__name";
+  name.value=s.name||""; name.placeholder="店名"; name.setAttribute("aria-label","店名");
+  name.addEventListener("input",function(){ s.name=name.value; persist(); });
+  card.appendChild(name);
+
+  var urlRow=el("div","shopcard__row");
+  urlRow.appendChild(el("label","taskcard__lbl","網址(選填,沒填就用店名搜 Naver 地圖)"));
+  var url=document.createElement("input"); url.type="url"; url.className="shopcard__url";
+  url.value=s.url||""; url.placeholder="貼上 Naver 地圖網址";
+  url.addEventListener("change",function(){ s.url=cleanUrl(url.value); url.value=s.url; persist(); });
+  urlRow.appendChild(url);
+  card.appendChild(urlRow);
+
+  var noteRow=el("div","shopcard__row");
+  noteRow.appendChild(el("label","taskcard__lbl","備註"));
+  var note=document.createElement("textarea"); note.className="shopcard__note";
+  note.value=s.note||""; note.placeholder="賣什麼、想買的東西、營業時間…";
+  note.addEventListener("input",function(){ s.note=note.value; persist(); });
+  noteRow.appendChild(note);
+  card.appendChild(noteRow);
+
+  function finish(){
+    s.name=name.value.trim(); s.url=cleanUrl(url.value); s.note=note.value.trim();
+    if(!s.name&&!s.url&&!s.note) a.shops=a.shops.filter(function(x){ return x!==s; });   /* 什麼都沒填就當沒新增 */
+    editingShop=null; persist(); renderShopping();
+  }
+  [name,url].forEach(function(inp){
+    inp.addEventListener("keydown",function(e){ if(e.key==="Enter"&&!e.isComposing){ e.preventDefault(); finish(); } });
+  });
+
+  var foot=el("div","shopcard__foot");
+  var move=document.createElement("select"); move.setAttribute("aria-label","移到其他分類");
+  state.shopping.forEach(function(x){
+    var o=document.createElement("option"); o.value=x.id; o.textContent=x.name||"未命名";
+    if(x===a) o.selected=true; move.appendChild(o);
+  });
+  move.addEventListener("change",function(){
+    var to=areaOf(move.value); if(!to||to===a) return;
+    a.shops=a.shops.filter(function(x){ return x!==s; }); to.shops.push(s);
+    persist(); renderShopping(); toast("已移到「"+(to.name||"未命名")+"」");
+  });
+  foot.appendChild(move);
+  foot.appendChild(armedButton("mini shopcard__del","刪除","再按一次",function(){
+    a.shops=a.shops.filter(function(x){ return x!==s; }); editingShop=null; persist(); renderShopping();
+  }));
+  var done=el("button","btn btn--go shopcard__done","完成"); done.type="button";
+  done.addEventListener("click",finish);
+  foot.appendChild(done);
+  card.appendChild(foot);
+  return card;
+}
+$("addArea").addEventListener("click",function(){
+  var a={id:uid("area"),name:"",shops:[]};
+  state.shopping.push(a); shopFilter="all"; persist(); renderShopping(); saveUiState();
+  var n=document.querySelector("#shopAreas .shoparea:last-child .shoparea__name"); if(n) n.focus();
+});
+
+/* ============ outfit(穿搭):一天一頁,左邊女生、右邊男生 ============
+   照片很大,不放進 state(不然每次同步、每 20 秒輪詢都要整包搬):
+   · 照片本體存在 localStorage 的 PHOTO_LS,雲端則是每張各自一筆(Sync.saveBlob)
+   · state.outfits 只記 {"d1~f": rev},別台看到 rev 跟自己的不同才去抓
+   · 上傳前先縮到長邊 960px 的 JPEG,一張大約 100KB */
+var PHOTO_LS="busan-tide-photos-v1";
+var OUTFIT_SIDES=[{k:"f",label:"女生",slot:"outfitF"},{k:"m",label:"男生",slot:"outfitM"}];
+var photos=loadPhotos();        /* {"d1~f":{rev, img, up}};up = 已上傳到哪組同步碼 */
+var photoBusy={}, photoRetry={}, outfitTarget=null;
+
+function loadPhotos(){
+  try{ var raw=localStorage.getItem(PHOTO_LS); if(raw){ var p=JSON.parse(raw); if(p&&typeof p==="object") return p; } }catch(e){}
+  return {};
+}
+function savePhotos(){
+  try{ localStorage.setItem(PHOTO_LS,JSON.stringify(photos)); return true; }
+  catch(e){ toast("這台瀏覽器的空間滿了,照片沒存進去"); return false; }
+}
+function photoKey(day,side){ return day+"~"+side; }
+function blobName(k){ return "outfit~"+k; }
+function isImgData(s){ return typeof s==="string"&&s.indexOf("data:image/")===0; }
+
+function shrinkImage(file){
+  return new Promise(function(resolve,reject){
+    if(file.type&&file.type.indexOf("image/")!==0){ reject(new Error("請選一張圖片")); return; }
+    var url=URL.createObjectURL(file), img=new Image();
+    img.onload=function(){
+      var MAX=960, w=img.naturalWidth, h=img.naturalHeight, k=Math.min(1,MAX/Math.max(w,h));
+      var c=document.createElement("canvas");
+      c.width=Math.max(1,Math.round(w*k)); c.height=Math.max(1,Math.round(h*k));
+      var g=c.getContext("2d");
+      g.fillStyle="#fff"; g.fillRect(0,0,c.width,c.height);
+      g.drawImage(img,0,0,c.width,c.height);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL("image/jpeg",0.76));
+    };
+    img.onerror=function(){ URL.revokeObjectURL(url); reject(new Error("這張圖讀不出來,換一張試試")); };
+    img.src=url;
+  });
+}
+
+/* 本機有、但還沒傳到目前這組同步碼的照片 → 補傳(離線時失敗的也會在這裡補) */
+function flushPhotos(){
+  var key=Sync.blobKey(); if(!key||viewingShared) return;
+  Object.keys(state.outfits).forEach(function(k){
+    var ph=photos[k];
+    if(!ph||!ph.img||ph.rev!==state.outfits[k]||ph.up===key||photoBusy[k]) return;
+    photoBusy[k]=true;
+    Sync.saveBlob(blobName(k),{rev:ph.rev,img:ph.img}).then(function(){
+      if(photos[k]&&photos[k].rev===ph.rev){ photos[k].up=key; savePhotos(); }
+    }).catch(function(){}).then(function(){ photoBusy[k]=false; });
+  });
+}
+/* state.outfits 說有新照片、本機卻還沒有 → 去雲端抓 */
+function fetchPhotos(){
+  if(!Sync.blobKey()||viewingShared) return;
+  var now=Date.now();
+  Object.keys(state.outfits).forEach(function(k){
+    var rev=state.outfits[k], ph=photos[k];
+    if(ph&&ph.rev===rev) return;
+    if(photoBusy[k]||(photoRetry[k]&&now-photoRetry[k]<15000)) return;
+    photoBusy[k]=true;
+    Sync.loadBlob(blobName(k)).then(function(d){
+      if(d&&isImgData(d.img)&&d.rev===state.outfits[k]){
+        photos[k]={rev:d.rev,img:d.img,up:Sync.blobKey()}; savePhotos(); renderOutfit();
+      } else photoRetry[k]=Date.now();      /* 別台可能還在上傳,等一下再試 */
+    }).catch(function(){ photoRetry[k]=Date.now(); }).then(function(){ photoBusy[k]=false; });
+  });
+}
+/* 照片已經從行程裡移除(或在別台被刪掉)→ 本機那份也清掉,省空間 */
+function prunePhotos(){
+  if(viewingShared) return;
+  var changed=false;
+  Object.keys(photos).forEach(function(k){ if(!state.outfits[k]){ delete photos[k]; changed=true; } });
+  if(changed) savePhotos();
+}
+function importPhotos(p){
+  var pics=p.outfitPhotos; delete p.outfitPhotos;
+  Object.keys(pics).forEach(function(k){
+    if(!isImgData(pics[k])) return;
+    var rev=p.outfits[k]||Date.now(); p.outfits[k]=rev;
+    photos[k]={rev:rev,img:pics[k],up:null};
+  });
+  savePhotos();
+}
+
+function pickPhoto(dayId,side){
+  if(viewingShared){ toast("正在看分享的行程,先存成你的行程再上傳照片"); return; }
+  outfitTarget={day:dayId,side:side};
+  $("outfitFile").click();
+}
+$("outfitFile").addEventListener("change",function(){
+  var input=$("outfitFile"), f=input.files&&input.files[0], target=outfitTarget;
+  input.value=""; outfitTarget=null;
+  if(!f||!target) return;
+  toast("照片處理中…");
+  shrinkImage(f).then(function(img){
+    var k=photoKey(target.day,target.side), rev=Date.now(), prev=photos[k];
+    photos[k]={rev:rev,img:img,up:null};
+    if(!savePhotos()){ if(prev) photos[k]=prev; else delete photos[k]; return; }
+    state.outfits[k]=rev; persist(); renderOutfit(); flushPhotos();
+    toast(Sync.blobKey()?"已存,會同步到其他裝置":"已存在這台裝置");
+  }).catch(function(err){ toast(err.message); });
+});
+function removePhoto(k){
+  delete state.outfits[k]; delete photos[k]; savePhotos(); persist(); renderOutfit();
+  if(Sync.blobKey()) Sync.saveBlob(blobName(k),{rev:Date.now(),img:null}).catch(function(){});
+  toast("已移除照片");
+}
+
+function openLightbox(src,alt){
+  var box=el("div","lightbox"), img=document.createElement("img");
+  img.src=src; img.alt=alt; box.appendChild(img);
+  var x=el("button","x","✕"); x.setAttribute("aria-label","關閉"); box.appendChild(x);
+  function close(){ box.remove(); document.removeEventListener("keydown",onKey); }
+  function onKey(e){ if(e.key==="Escape") close(); }
+  box.addEventListener("click",close);
+  document.addEventListener("keydown",onKey);
+  document.body.appendChild(box);
+}
+
+function paintSlot(box,day,side){
+  box.innerHTML=""; box.className="outfit__slot outfit__slot--"+side.k;
+  var k=photoKey(day.id,side.k), rev=state.outfits[k], ph=photos[k];
+  box.appendChild(el("div","outfit__who",side.label));
+  var frame=el("button","outfit__frame"); frame.type="button";
+  if(rev&&ph&&ph.rev===rev&&isImgData(ph.img)){
+    var img=document.createElement("img"); img.src=ph.img; img.alt=day.date+" "+side.label+"穿搭";
+    frame.appendChild(img); frame.title="點一下放大";
+    frame.addEventListener("click",function(){ openLightbox(ph.img,img.alt); });
+  } else {
+    frame.classList.add("is-empty");
+    if(rev){
+      frame.appendChild(el("span","outfit__ph",Sync.blobKey()?"照片同步中…":"照片在別台裝置,開「同步」才看得到"));
+    } else {
+      frame.appendChild(el("span","outfit__plus","＋"));
+      frame.appendChild(el("span","outfit__ph","上傳"+side.label+"穿搭"));
+    }
+    frame.addEventListener("click",function(){ pickPhoto(day.id,side.k); });
+  }
+  box.appendChild(frame);
+  if(rev){
+    var acts=el("div","outfit__acts");
+    var re=el("button","btn","換一張"); re.type="button";
+    re.addEventListener("click",function(){ pickPhoto(day.id,side.k); });
+    var del=el("button","btn btn--warn","移除"); del.type="button";
+    var armed=false;
+    del.addEventListener("click",function(){
+      if(!armed){ armed=true; del.textContent="再按一次"; setTimeout(function(){armed=false;del.textContent="移除";},3000); return; }
+      removePhoto(k);
+    });
+    acts.appendChild(re); acts.appendChild(del);
+    box.appendChild(acts);
+  }
+}
+function dayIndex(id){ for(var i=0;i<DAYS.length;i++) if(DAYS[i].id===id) return i; return 0; }
+function hasOutfit(dayId){ return !!(state.outfits[photoKey(dayId,"f")]||state.outfits[photoKey(dayId,"m")]); }
+function renderOutfit(){
+  var i=dayIndex(activeDay), day=DAYS[i];
+  $("outfitDate").textContent=day.date+"(週"+day.dow+")";
+  $("outfitLabel").textContent=day.label;
+
+  var ul=$("outfitPlaces"), seen={}; ul.innerHTML="";
+  eventsOf(day.id).slice().sort(function(a,b){ return a.start-b.start; }).forEach(function(e){
+    var s=spotOf(e.spot), name=s?s.name:(e.title||"");
+    if(!name||seen[name]) return; seen[name]=true;
+    var li=el("li","outfit__place",name); li.style.setProperty("--cat",catVar(s?s.cat:"sight"));
+    ul.appendChild(li);
+  });
+  if(!ul.children.length) ul.appendChild(el("li","outfit__place outfit__place--none","這天還沒排行程"));
+
+  OUTFIT_SIDES.forEach(function(side){ paintSlot($(side.slot),day,side); });
+  $("outfitPrev").disabled=(i===0);
+  $("outfitNext").disabled=(i===DAYS.length-1);
+
+  var dots=$("outfitDots"); dots.innerHTML="";
+  DAYS.forEach(function(d,j){
+    var b=el("button","outfit__dot"+(j===i?" on":"")+(hasOutfit(d.id)?" has":""),d.date);
+    b.type="button"; b.setAttribute("role","tab"); b.setAttribute("aria-selected",j===i?"true":"false");
+    b.title=d.date+"(週"+d.dow+") "+d.label;
+    b.addEventListener("click",function(){ gotoOutfitDay(d.id); });
+    dots.appendChild(b);
+  });
+
+  $("outfitSub").textContent="左邊女生、右邊男生 · 點空格上傳照片 · "+
+    (Sync.blobKey()?"照片會同步到其他裝置":"照片只存在這台,開「同步」才會共用");
+  var n=DAYS.filter(function(d){ return hasOutfit(d.id); }).length;
+  $("outfitCount").textContent=n?(n+"/"+DAYS.length):"";
+
+  prunePhotos(); fetchPhotos(); flushPhotos();
+}
+function gotoOutfitDay(id){
+  activeDay=id;
+  renderOutfit(); renderDaySelect(); renderGrid(); renderSpots(); saveUiState();
+}
+$("outfitPrev").addEventListener("click",function(){ var i=dayIndex(activeDay); if(i>0) gotoOutfitDay(DAYS[i-1].id); });
+$("outfitNext").addEventListener("click",function(){ var i=dayIndex(activeDay); if(i<DAYS.length-1) gotoOutfitDay(DAYS[i+1].id); });
+document.addEventListener("keydown",function(e){
+  if(currentView!=="outfit"||sheetCtx||document.querySelector(".lightbox")) return;
+  var t=e.target; if(t&&(t.tagName==="INPUT"||t.tagName==="TEXTAREA"||t.tagName==="SELECT"||t.isContentEditable)) return;
+  if(e.key==="ArrowLeft") $("outfitPrev").click();
+  else if(e.key==="ArrowRight") $("outfitNext").click();
+});
+/* 照片補傳／補抓:網路回來、切回視窗,以及每 20 秒順手檢查一次(沒事要做就不會發請求) */
+function syncPhotos(){ if(!document.hidden){ flushPhotos(); fetchPhotos(); } }
+window.addEventListener("online",syncPhotos);
+window.addEventListener("focus",syncPhotos);
+setInterval(syncPhotos,20000);
 
 /* ============ drag ============ */
 var drag=null, ghost=null, preview=null, rafId=null, lastDragEnd=0;
@@ -994,23 +1394,27 @@ $("resetAll").addEventListener("click",function(){
   var b=$("resetAll");
   if(!resetArmed){ resetArmed=true; b.textContent="再按一次:會清掉你的所有調整";
     setTimeout(function(){resetArmed=false;b.textContent="回復預設行程";},4000); return; }
-  state=seed(); viewingShared=false; hideBanner(); persist(); renderAll(); b.textContent="回復預設行程"; resetArmed=false; toast("已回復預設");
+  /* 穿搭照片、逛街清單都是自己填的,不算「預設行程」,回復時保留 */
+  var keepOutfits=state.outfits||{}, keepShopping=state.shopping;
+  state=seed(); state.outfits=keepOutfits; if(Array.isArray(keepShopping)) state.shopping=keepShopping; viewingShared=false; hideBanner(); persist(); renderAll(); b.textContent="回復預設行程"; resetArmed=false; toast("已回復預設");
 });
 $("daySel").addEventListener("change",function(){
   activeDay=$("daySel").value;
-  /* 在待確認/代辦/要帶時挑日期,直接跳回那天的行程表 */
-  if(currentView!=="itin") switchView("itin");
-  renderGrid(); renderSpots(); scrollToDay(); saveUiState();
+  /* 在待確認/代辦/要帶時挑日期,直接跳回那天的行程表;在穿搭就留在穿搭換那天 */
+  if(currentView!=="itin"&&currentView!=="outfit") switchView("itin");
+  renderGrid(); renderSpots(); renderOutfit(); scrollToDay(); saveUiState();
 });
 
-/* 主檢視切換:行程表 / 待確認 / 代辦 / 要帶。景點櫃固定在右側,不受切換影響。
+/* 主檢視切換:行程表 / 待確認 / 代辦 / 要帶 / 穿搭 / 逛街。景點櫃固定在右側,不受切換影響。
    日期選單四個檢視都留著,分頁按鈕的位置才不會跳來跳去。 */
 var currentView="itin";
 var VIEWS=[
   {k:"itin",tab:"viewItin",panel:"panelItin"},
   {k:"todos",tab:"viewTodos",panel:"panelTodos"},
   {k:"tasks",tab:"viewTasks",panel:"panelTasks"},
-  {k:"packing",tab:"viewPacking",panel:"panelPacking"}
+  {k:"packing",tab:"viewPacking",panel:"panelPacking"},
+  {k:"outfit",tab:"viewOutfit",panel:"panelOutfit"},
+  {k:"shop",tab:"viewShop",panel:"panelShop"}
 ];
 VIEWS.forEach(function(v){
   $(v.tab).addEventListener("click",function(){ switchView(v.k); });
@@ -1022,11 +1426,12 @@ function switchView(which){
     $(v.tab).setAttribute("aria-selected",on?"true":"false");
     $(v.panel).hidden=!on;
   });
-  $("daySel").classList.toggle("is-idle", which!=="itin");
+  $("daySel").classList.toggle("is-idle", which!=="itin"&&which!=="outfit");
+  if(which==="outfit") renderOutfit();
   saveUiState();
 }
 
-function renderAll(){ renderDaySelect(); renderGrid(); renderFilters(); renderSpots(); renderTodos(); renderTaskFilter(); renderTasks(); renderPackFilter(); renderPacking(); }
+function renderAll(){ renderDaySelect(); renderGrid(); renderFilters(); renderSpots(); renderTodos(); renderTaskFilter(); renderTasks(); renderPackFilter(); renderPacking(); renderOutfit(); renderShopping(); }
 function scrollToDay(){
   var list=eventsOf(activeDay), anchor=540;
   if(list.length) anchor=list.reduce(function(a,b){ return a.start<b.start?a:b; }).start;
@@ -1042,5 +1447,6 @@ Sync.init({
   getState:   function(){ return viewingShared ? null : state; },
   applyState: adoptState,
   setStatus:  setSync,
-  toast:      toast
+  toast:      toast,
+  onConnect:  renderOutfit      /* 同步一接上就補傳／補抓穿搭照片 */
 });

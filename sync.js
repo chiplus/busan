@@ -168,7 +168,29 @@ export function notifyChange(){
   pushTimer = setTimeout(pushNow, PUSH_DEBOUNCE_MS);
 }
 
+/* ---------- 附件(穿搭照片):各自一筆,不塞進行程那包 ----------
+   照片很大,放進行程 JSON 的話每 20 秒輪詢都要整包重抓。
+   所以每張照片另存一筆,id 是「同步碼~名稱」,一樣走 get_plan / save_plan,
+   不用改資料庫。行程本體裡只記每張照片的 rev,別台發現 rev 不同才來抓。 */
+
+export function blobKey(){
+  return (syncKey && configured()) ? syncKey : null;
+}
+export function saveBlob(name, data){
+  if(!blobKey()) return Promise.reject(new Error("尚未開啟同步"));
+  if(navigator.onLine === false) return Promise.reject(new Error("離線中"));
+  return rpc("save_plan", {p_id: syncKey + "~" + name, p_data: data});
+}
+export function loadBlob(name){
+  if(!blobKey()) return Promise.resolve(null);
+  if(navigator.onLine === false) return Promise.reject(new Error("離線中"));
+  return rpc("get_plan", {p_id: syncKey + "~" + name}).then(function(rows){
+    return (rows && rows.length && rows[0].data) ? rows[0].data : null;
+  });
+}
+
 function start(){
+  if(hooks && hooks.onConnect) hooks.onConnect();
   clearInterval(pollTimer);
   pollTimer = setInterval(function(){
     if(document.hidden) return;

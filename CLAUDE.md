@@ -49,6 +49,7 @@ README.md             給人看的說明
 | `SEED_TODOS` | 「待確認」清單 |
 | `SEED_TASKS` | 「代辦」清單(含人員指定) |
 | `SEED_PACKING` | 「要帶」清單(含人員指定) |
+| `SEED_SHOPPING` | 「逛街」的地區分類:`{id, name, shops:[{id, name, url, note}]}`,「回復預設行程」不會清掉使用者填的店家 |
 | `DAY_START` / `DAY_END` | 時間軸起訖,450(07:30)到 1320(22:00) |
 | `SNAP` | 吸附刻度,30 分鐘 |
 | `PPM` | 每分鐘幾像素,1.5 |
@@ -128,6 +129,7 @@ git push
 - 每 20 秒、以及視窗重新取得焦點時,向雲端拉一次;`rev`(毫秒時間戳)較新才覆蓋本機
 - 衝突是**後寫的贏**,整包覆蓋,沒有欄位級合併
 - 沒填設定或連不上時全部降級成純 localStorage,不會壞
+- **穿搭照片不在行程那包裡**:照片本體存在 localStorage `busan-tide-photos-v1`,雲端每張各自一筆(id = `同步碼~outfit~d1~f`,一樣走 `get_plan`/`save_plan`,不用改 SQL);`state.outfits` 只記 `{"d1~f": rev}`。這樣 20 秒輪詢才不會一直重抓照片。分享網址不帶照片,匯出檔會帶(`outfitPhotos`)
 - **離線處理**:`dirty` 旗標記著「有改動還沒上傳」。離線時只存本機並顯示「離線中 · 改動已存本機」;`online` 事件、每次輪詢與視窗取得焦點時都會檢查 `dirty`,有欠的就補傳
 
 資料表與兩個 RPC 函式的 SQL 在 `README.md` 的「跨裝置同步」那節。**RLS 全關(沒有任何 policy),所有存取只能走 `get_plan` / `save_plan` 兩個 SECURITY DEFINER 函式**,所以光有 publishable key 無法列舉別人的行程。改動這塊時不要為了方便去開資料表的 policy。

@@ -80,6 +80,8 @@ function showUpdate(sw) {
       <button class="viewtab" id="viewTodos" role="tab" aria-selected="false">待確認<u id="todoCount"></u></button>
       <button class="viewtab" id="viewTasks" role="tab" aria-selected="false">代辦<u id="taskCount"></u></button>
       <button class="viewtab" id="viewPacking" role="tab" aria-selected="false">要帶<u id="packCount"></u></button>
+      <button class="viewtab" id="viewOutfit" role="tab" aria-selected="false">穿搭<u id="outfitCount"></u></button>
+      <button class="viewtab" id="viewShop" role="tab" aria-selected="false">逛街<u id="shopCount"></u></button>
     </div>
     <div class="railtools">
       <button class="tbtn" id="btnTheme" title="切換淺色／深色"><span class="themedot system" id="themeIcon" aria-hidden="true"></span><span id="themeLabel">系統</span></button>
@@ -150,6 +152,42 @@ function showUpdate(sw) {
       <div class="filters" id="packWhoFilter" role="tablist" aria-label="依人員篩選"></div>
       <div class="packgrid" id="packing"></div>
       <button class="btn" id="addPack">＋ 新增物品</button>
+    </div>
+  </section>
+
+  <section class="chart" id="panelOutfit" hidden>
+    <div class="chart__head"><div>
+      <div class="chart__title">每日穿搭</div>
+      <div class="chart__sub" id="outfitSub">左邊女生、右邊男生 · 點空格上傳照片</div>
+    </div></div>
+    <div class="outfit">
+      <button class="outfit__nav" id="outfitPrev" type="button" aria-label="前一天">‹</button>
+      <div class="outfit__main">
+        <div class="outfit__day">
+          <div class="outfit__date" id="outfitDate"></div>
+          <div class="outfit__label" id="outfitLabel"></div>
+          <ul class="outfit__places" id="outfitPlaces" aria-label="當天會去的地方"></ul>
+        </div>
+        <div class="outfit__pair">
+          <div class="outfit__slot" id="outfitF"></div>
+          <div class="outfit__slot" id="outfitM"></div>
+        </div>
+        <div class="outfit__dots" id="outfitDots" role="tablist" aria-label="選擇日期"></div>
+      </div>
+      <button class="outfit__nav" id="outfitNext" type="button" aria-label="後一天">›</button>
+    </div>
+    <input type="file" id="outfitFile" accept="image/*" hidden>
+  </section>
+
+  <section class="chart" id="panelShop" hidden>
+    <div class="chart__head"><div>
+      <div class="chart__title">逛街</div>
+      <div class="chart__sub">依地區分類的店家清單 · 店名、網址、賣些什麼</div>
+    </div></div>
+    <div class="listwrap">
+      <div class="filters" id="shopAreaFilter" role="tablist" aria-label="依地區篩選"></div>
+      <div class="shopareas" id="shopAreas"></div>
+      <button class="btn" id="addArea">＋ 新增分類</button>
     </div>
   </section>
 
