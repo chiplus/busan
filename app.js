@@ -619,6 +619,26 @@ function guessPackIcon(text){
   for(var i=0;i<PACK_ICON_RULES.length;i++){ if(PACK_ICON_RULES[i][0].test(text)) return PACK_ICON_RULES[i][1]; }
   return "🧳";
 }
+/* 清單依 icon 分組排列,同類的放一起。這是「顯示」的順序(證件 → 錢 → 3C → 藥 → 保養 → 衣物 → 包包…),
+   跟上面 PACK_ICON_RULES 的「比對」優先順序是兩回事;沒對到任何規則的排最後。 */
+var PACK_GROUP_ORDER=["🛂","📄","💳","👛","🚇","📶","🔌","🔋","💻","📷","🎧","⌚",
+  "💊","😷","🌡️","♨️","🧴","👁️","💄","🧼","🧻","👕","🧣","🧢","👟","🕶️","☂️",
+  "🎒","🧳","🛍️","🛌","💧","🍫","🔑","🖊️","📖"];
+function packRank(text){
+  for(var i=0;i<PACK_ICON_RULES.length;i++){
+    if(PACK_ICON_RULES[i][0].test(text||"")){
+      var r=PACK_GROUP_ORDER.indexOf(PACK_ICON_RULES[i][1]);
+      return r===-1?PACK_GROUP_ORDER.length:r;
+    }
+  }
+  return PACK_GROUP_ORDER.length+1;
+}
+function sortPack(items){
+  return items.map(function(t,i){ return {t:t,r:packRank(t.text),i:i}; })
+    .sort(function(a,b){ return a.r-b.r||a.i-b.i; })
+    .map(function(x){ return x.t; });
+}
+var justAddedPack=null;
 var packFilter=(uiState&&(uiState.packFilter==="lee"||uiState.packFilter==="kiwi"))?uiState.packFilter:"all";
 function renderPackFilter(){
   renderWhoFilterBar("packWhoFilter",function(){return packFilter;},function(v){packFilter=v;},renderPacking);
@@ -644,8 +664,14 @@ function packSection(title,items,kind,emptyText){
   var h=el("div","packsec__head"); h.appendChild(el("span",null,title)); h.appendChild(el("u",null,String(items.length)));
   sec.appendChild(h);
   if(!items.length){ sec.appendChild(el("div","packsec__none",emptyText)); return sec; }
-  var ul=el("ul","packsec__list");
-  items.forEach(function(t){ ul.appendChild(packRow(t)); });
+  var ul=el("ul","packsec__list"), prev=null;
+  sortPack(items).forEach(function(t){
+    var row=packRow(t), icon=guessPackIcon(t.text);
+    if(prev!==null&&icon!==prev) row.classList.add("grpstart");   /* 換一組 → 分隔線粗一點 */
+    if(t.id===justAddedPack) row.classList.add("just-added");
+    prev=icon; ul.appendChild(row);
+  });
+  justAddedPack=null;
   sec.appendChild(ul);
   return sec;
 }
@@ -677,7 +703,8 @@ function isEnter(e){ return e.key==="Enter"&&!e.isComposing&&e.keyCode!==229; }
 function addPackItem(){
   var inp=$("packNew"), v=inp.value.trim();
   if(!v){ inp.focus(); return; }
-  state.packing.push({id:uid("p"),text:v,done:false,who:packFilter==="all"?[]:[packFilter]});
+  var item={id:uid("p"),text:v,done:false,who:packFilter==="all"?[]:[packFilter]};
+  state.packing.push(item); justAddedPack=item.id;     /* 會排進同類那一組,閃一下讓人看到放在哪 */
   persist(); renderPacking();
   inp.value=""; $("packAddIcon").textContent="＋"; inp.focus();     /* 游標留在輸入框,可以連續新增 */
 }

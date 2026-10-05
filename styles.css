@@ -296,6 +296,9 @@ input,textarea,select{font:inherit;color:inherit}
   border:1px dashed var(--line);border-radius:12px}
 .packrow{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;padding:9px 10px 9px 12px;min-width:0}
 .packrow+.packrow{border-top:1px solid var(--line-soft)}
+.packrow.grpstart{border-top:1px solid var(--line)}
+.packrow.just-added{animation:packflash 1.6s ease-out}
+@keyframes packflash{from{background:color-mix(in srgb,var(--brine) 22%,transparent)}to{background:transparent}}
 .packrow input[type="checkbox"]{flex:0 0 auto;width:18px;height:18px;margin:0;accent-color:var(--brine);cursor:pointer}
 .packrow__icon{flex:0 0 22px;text-align:center;font-size:17px;line-height:1}
 .packrow__name{flex:1 1 140px;min-width:0;font-size:13.5px;line-height:1.45;color:var(--text);

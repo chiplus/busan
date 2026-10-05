@@ -18,7 +18,7 @@
    啟用時自動清掉。
    ============================================================ */
 
-const VERSION = '2026-10-05a';
+const VERSION = '2026-10-05b';
 const SHELL   = 'busan-shell-' + VERSION;
 const FONTS   = 'busan-fonts-v1';
 
