@@ -619,19 +619,14 @@ function guessPackIcon(text){
   for(var i=0;i<PACK_ICON_RULES.length;i++){ if(PACK_ICON_RULES[i][0].test(text)) return PACK_ICON_RULES[i][1]; }
   return "🧳";
 }
-/* 清單依 icon 分組排列,同類的放一起。這是「顯示」的順序(證件 → 錢 → 3C → 藥 → 保養 → 衣物 → 包包…),
-   跟上面 PACK_ICON_RULES 的「比對」優先順序是兩回事;沒對到任何規則的排最後。 */
+/* 清單依「看到的 icon」分組:同一個 icon 一定排在一起(包括沒對到規則、預設顯示 🧳 的,
+   會跟行李箱那組放一起)。組的先後照 PACK_GROUP_ORDER(證件 → 錢 → 3C → 藥 → 保養 → 衣物 → 包包…)。 */
 var PACK_GROUP_ORDER=["🛂","📄","💳","👛","🚇","📶","🔌","🔋","💻","📷","🎧","⌚",
   "💊","😷","🌡️","♨️","🧴","👁️","💄","🧼","🧻","👕","🧣","🧢","👟","🕶️","☂️",
   "🎒","🧳","🛍️","🛌","💧","🍫","🔑","🖊️","📖"];
 function packRank(text){
-  for(var i=0;i<PACK_ICON_RULES.length;i++){
-    if(PACK_ICON_RULES[i][0].test(text||"")){
-      var r=PACK_GROUP_ORDER.indexOf(PACK_ICON_RULES[i][1]);
-      return r===-1?PACK_GROUP_ORDER.length:r;
-    }
-  }
-  return PACK_GROUP_ORDER.length+1;
+  var r=PACK_GROUP_ORDER.indexOf(guessPackIcon(text));
+  return r===-1?PACK_GROUP_ORDER.length:r;
 }
 function sortPack(items){
   return items.map(function(t,i){ return {t:t,r:packRank(t.text),i:i}; })
