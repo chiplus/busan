@@ -623,35 +623,69 @@ var packFilter=(uiState&&(uiState.packFilter==="lee"||uiState.packFilter==="kiwi
 function renderPackFilter(){
   renderWhoFilterBar("packWhoFilter",function(){return packFilter;},function(v){packFilter=v;},renderPacking);
 }
+/* 條列式勾選清單:上面「還沒打包」、下面「已打包」,勾了就移到下面,不會混在一起。
+   新增列在清單上方,在 Lee／Kiwi 篩選下新增的東西會直接指定給那個人(不然一新增就被篩掉看不到)。 */
 function renderPacking(){
   var w=$("packing"); w.innerHTML="";
   var list=state.packing||[];
   var open=list.filter(function(t){return !t.done;}).length;
   $("packCount").textContent=list.length?(open?open:"✓"):"";
+  var who=PEOPLE.filter(function(p){return p.id===packFilter;})[0];
+  $("packNew").placeholder=who?("新增 "+who.label+" 要帶的東西,按 Enter"):"輸入要帶的東西,按 Enter 新增";
+
   var shown=packFilter==="all"?list:list.filter(function(t){return whoArr(t).indexOf(packFilter)!==-1;});
-  if(!shown.length){ w.appendChild(el("div","none",list.length?"這個人目前沒有要帶的東西":"目前沒有要帶的東西")); return; }
-  shown.forEach(function(t){
-    var card=el("div","packcard"+(t.done?" done":""));
-
-    var top=el("div","packcard__top");
-    var icon=el("span","packcard__icon",guessPackIcon(t.text));
-    top.appendChild(icon);
-    var cb=document.createElement("input"); cb.type="checkbox"; cb.checked=!!t.done;
-    cb.addEventListener("change",function(){ t.done=cb.checked; persist(); renderPacking(); });
-    top.appendChild(cb);
-    var name=el("div","packcard__name",t.text); name.contentEditable="true"; name.spellcheck=false;
-    name.addEventListener("input",function(){ icon.textContent=guessPackIcon(name.textContent); });
-    name.addEventListener("blur",function(){ t.text=name.textContent.trim()||t.text; persist(); renderPacking(); });
-    top.appendChild(name);
-    var del=el("button","mini","✕"); del.title="刪除";
-    del.addEventListener("click",function(){ state.packing=state.packing.filter(function(x){return x!==t;}); persist(); renderPacking(); });
-    top.appendChild(del);
-    card.appendChild(top);
-
-    card.appendChild(buildWhoPills(t,renderPacking));
-    w.appendChild(card);
-  });
+  var todo=shown.filter(function(t){return !t.done;}), done=shown.filter(function(t){return t.done;});
+  w.appendChild(packSection("還沒打包",todo,"todo",
+    shown.length?"全部打包好了":(list.length?"這個人目前沒有要帶的東西":"還沒有東西,從上面輸入框新增")));
+  if(done.length) w.appendChild(packSection("已打包",done,"done",""));
 }
+function packSection(title,items,kind,emptyText){
+  var sec=el("section","packsec packsec--"+kind);
+  var h=el("div","packsec__head"); h.appendChild(el("span",null,title)); h.appendChild(el("u",null,String(items.length)));
+  sec.appendChild(h);
+  if(!items.length){ sec.appendChild(el("div","packsec__none",emptyText)); return sec; }
+  var ul=el("ul","packsec__list");
+  items.forEach(function(t){ ul.appendChild(packRow(t)); });
+  sec.appendChild(ul);
+  return sec;
+}
+function packRow(t){
+  var row=el("li","packrow"+(t.done?" done":""));
+  var cb=document.createElement("input"); cb.type="checkbox"; cb.checked=!!t.done;
+  cb.setAttribute("aria-label",(t.done?"取消打勾:":"打勾:")+t.text);
+  cb.addEventListener("change",function(){ t.done=cb.checked; persist(); renderPacking(); });
+  row.appendChild(cb);
+  var icon=el("span","packrow__icon",guessPackIcon(t.text)); icon.setAttribute("aria-hidden","true");
+  row.appendChild(icon);
+  var name=el("div","packrow__name",t.text); name.contentEditable="true"; name.spellcheck=false;
+  name.addEventListener("input",function(){ icon.textContent=guessPackIcon(name.textContent); });
+  name.addEventListener("keydown",function(e){ if(isEnter(e)){ e.preventDefault(); name.blur(); } });
+  name.addEventListener("blur",function(){
+    var v=name.textContent.trim();
+    if(v&&v!==t.text){ t.text=v; persist(); renderPacking(); }
+    else if(!v){ name.textContent=t.text; icon.textContent=guessPackIcon(t.text); }   /* 清空不算,還原原本的字 */
+  });
+  row.appendChild(name);
+  row.appendChild(buildWhoPills(t,renderPacking));
+  var del=el("button","mini packrow__del","✕"); del.type="button"; del.title="刪除"; del.setAttribute("aria-label","刪除 "+t.text);
+  del.addEventListener("click",function(){ state.packing=state.packing.filter(function(x){return x!==t;}); persist(); renderPacking(); });
+  row.appendChild(del);
+  return row;
+}
+/* 注音／拼音選字時按的 Enter 不算(Safari 會給 keyCode 229) */
+function isEnter(e){ return e.key==="Enter"&&!e.isComposing&&e.keyCode!==229; }
+function addPackItem(){
+  var inp=$("packNew"), v=inp.value.trim();
+  if(!v){ inp.focus(); return; }
+  state.packing.push({id:uid("p"),text:v,done:false,who:packFilter==="all"?[]:[packFilter]});
+  persist(); renderPacking();
+  inp.value=""; $("packAddIcon").textContent="＋"; inp.focus();     /* 游標留在輸入框,可以連續新增 */
+}
+$("packNew").addEventListener("input",function(){
+  var v=$("packNew").value.trim(); $("packAddIcon").textContent=v?guessPackIcon(v):"＋";
+});
+$("packNew").addEventListener("keydown",function(e){ if(isEnter(e)){ e.preventDefault(); addPackItem(); } });
+$("addPack").addEventListener("click",addPackItem);
 
 /* ============ shopping(逛街):依地區分類,每家店有店名／網址／備註 ============
    state.shopping=[{id,name,shops:[{id,name,url,note}]}]。
@@ -1383,11 +1417,8 @@ $("addTodo").addEventListener("click",function(){
   state.todos.push({id:uid("t"),text:"新的待辦事項",done:false}); persist(); renderTodos();
 });
 $("addTask").addEventListener("click",function(){
-  state.tasks.push({id:uid("k"),text:"新的代辦事項",done:false,who:[],url:"",deadline:"",note:""});
+  state.tasks.push({id:uid("k"),text:"新的代辦事項",done:false,who:taskFilter==="all"?[]:[taskFilter],url:"",deadline:"",note:""});
   persist(); renderTasks();
-});
-$("addPack").addEventListener("click",function(){
-  state.packing.push({id:uid("p"),text:"要帶的東西",done:false,who:[]}); persist(); renderPacking();
 });
 var resetArmed=false;
 $("resetAll").addEventListener("click",function(){

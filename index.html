@@ -150,8 +150,13 @@ function showUpdate(sw) {
     </div></div>
     <div class="listwrap">
       <div class="filters" id="packWhoFilter" role="tablist" aria-label="依人員篩選"></div>
-      <div class="packgrid" id="packing"></div>
-      <button class="btn" id="addPack">＋ 新增物品</button>
+      <div class="packadd">
+        <span class="packadd__icon" id="packAddIcon" aria-hidden="true">＋</span>
+        <input class="packadd__input" id="packNew" type="text" enterkeyhint="done" autocomplete="off"
+               placeholder="輸入要帶的東西,按 Enter 新增" aria-label="新增要帶的東西">
+        <button class="btn btn--go packadd__btn" id="addPack" type="button">新增</button>
+      </div>
+      <div class="packlist" id="packing"></div>
     </div>
   </section>
 
