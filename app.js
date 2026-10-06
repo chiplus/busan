@@ -262,12 +262,61 @@ function toast(msg){
   clearTimeout(statusTimer); statusTimer=setTimeout(function(){statusEl.classList.remove("show");},2200);
 }
 
-/* ============ countdown ============ */
+/* ============ countdown ============
+   倒數到去程起飛(台灣時間 10/09 16:40),每秒更新。
+   · 10/09 當天:頁首變成「今天出發!」金色膠囊 + 撒彩帶(點頁首可以再撒一次),起飛那一刻再撒一次
+   · 10/10–10/14:顯示「旅程第 N 天」;之後就不顯示
+   測試用:網址加 ?now=2026-10-09T10:00 可以假裝現在是那個時間(只影響這個倒數)。 */
+var TAKEOFF=new Date("2026-10-09T16:40:00+08:00");
+var TRIP_FIRST=new Date(2026,9,9), TRIP_LAST=new Date(2026,9,14);
+var clockOffset=0, lastLeft=null, partyOn=false;
 (function(){
-  var target=new Date(2026,9,9), now=new Date();
-  var d=Math.ceil((target-new Date(now.getFullYear(),now.getMonth(),now.getDate()))/86400000);
-  $("countdown").textContent = d>0?("· 還有 "+d+" 天"):(d===0?"· 就是今天":"");
+  var m=/[?&]now=([^&]+)/.exec(location.search);
+  if(m){ var t=new Date(decodeURIComponent(m[1])); if(!isNaN(t.getTime())) clockOffset=t.getTime()-Date.now(); }
 })();
+function pad2(n){ return (n<10?"0":"")+n; }
+function tickCountdown(){
+  var now=new Date(Date.now()+clockOffset), out=$("countdown");
+  var today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  var tripDay=Math.round((today-TRIP_FIRST)/86400000)+1;     /* 10/09 = 第 1 天 */
+  var left=TAKEOFF-now;
+  var isParty=(tripDay===1);
+  if(isParty&&!partyOn){ partyOn=true; out.classList.add("party"); document.querySelector(".masthead").classList.add("is-party"); confetti(); }
+  if(lastLeft!==null&&lastLeft>0&&left<=0) confetti();      /* 正好開著頁面等到起飛 */
+  lastLeft=left;
+  if(left>0){
+    var s=Math.floor(left/1000), d=Math.floor(s/86400);
+    var clock=pad2(Math.floor(s%86400/3600))+":"+pad2(Math.floor(s%3600/60))+":"+pad2(s%60);
+    out.textContent=isParty?("🎉 今天出發!起飛倒數 "+clock):("· 還有 "+(d?d+" 天 ":"")+clock);
+  } else if(isParty){
+    out.textContent="🎉 出發囉!釜山見";
+  } else if(today<=TRIP_LAST&&tripDay>1){
+    out.textContent="· 旅程第 "+tripDay+" 天";
+  } else out.textContent="";
+}
+/* 頁首撒彩帶:一次 70 片,落完自己清掉。系統設定「減少動態效果」時 styles.css 會把動畫關掉。 */
+function confetti(){
+  var head=document.querySelector(".masthead"); if(!head) return;
+  var box=el("div","confetti"); box.setAttribute("aria-hidden","true");
+  box.style.setProperty("--fall",(head.offsetHeight+30)+"px");
+  var COLORS=["#FFD166","#F0764B","#9ED8D8","#D686AE","#6FAE87","#FFFFFF","#5FCBD6"];
+  for(var i=0;i<70;i++){
+    var p=document.createElement("i");
+    p.style.left=(Math.random()*100)+"%";
+    p.style.background=COLORS[i%COLORS.length];
+    p.style.setProperty("--delay",(Math.random()*1.4).toFixed(2)+"s");
+    p.style.setProperty("--dur",(2.4+Math.random()*1.8).toFixed(2)+"s");
+    p.style.setProperty("--dx",Math.round(Math.random()*120-60)+"px");
+    p.style.setProperty("--rot",Math.round(Math.random()*900-450)+"deg");
+    if(i%3===0){ p.style.width="6px"; p.style.height="6px"; p.style.borderRadius="50%"; }
+    box.appendChild(p);
+  }
+  head.appendChild(box);
+  setTimeout(function(){ box.remove(); },5000);
+}
+document.querySelector(".masthead").addEventListener("click",function(){ if(partyOn) confetti(); });
+tickCountdown();
+setInterval(tickCountdown,1000);
 
 /* ============ day selector (「行程表」檢視的下拉選單) ============ */
 function renderDaySelect(){
