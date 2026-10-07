@@ -565,62 +565,76 @@ function renderTasks(){
   var open=list.filter(function(t){return !t.done;}).length;
   $("taskCount").textContent=list.length?(open?open:"✓"):"";
   var shown=taskFilter==="all"?list:list.filter(function(t){return whoArr(t).indexOf(taskFilter)!==-1;});
-  if(!shown.length){ w.appendChild(el("div","none",list.length?"這個人目前沒有代辦":"目前沒有代辦")); return; }
-  shown.forEach(function(t){
-    var card=el("div","taskcard"+(t.done?" done":""));
+  /* 跟「要帶」一樣分兩區:上面還沒做、下面已完成,勾了就移下去 */
+  var todo=shown.filter(function(t){return !t.done;}), done=shown.filter(function(t){return t.done;});
+  w.appendChild(taskSection("還沒做",todo,"todo",
+    shown.length?"全部做完了":(list.length?"這個人目前沒有代辦":"目前沒有代辦")));
+  if(done.length) w.appendChild(taskSection("已完成",done,"done",""));
+}
+function taskSection(title,items,kind,emptyText){
+  var sec=el("section","packsec packsec--"+kind);    /* 區塊標題沿用「要帶」的樣式 */
+  var h=el("div","packsec__head"); h.appendChild(el("span",null,title)); h.appendChild(el("u",null,String(items.length)));
+  sec.appendChild(h);
+  if(!items.length){ sec.appendChild(el("div","packsec__none",emptyText)); return sec; }
+  var grid=el("div","taskgrid");
+  items.forEach(function(t){ grid.appendChild(taskCard(t)); });
+  sec.appendChild(grid);
+  return sec;
+}
+function taskCard(t){
+  var card=el("div","taskcard"+(t.done?" done":""));
 
-    var top=el("div","taskcard__top");
-    var cb=document.createElement("input"); cb.type="checkbox"; cb.checked=!!t.done;
-    cb.addEventListener("change",function(){ t.done=cb.checked; persist(); renderTasks(); });
-    top.appendChild(cb);
-    var name=el("div","taskcard__name",t.text); name.contentEditable="true"; name.spellcheck=false;
-    name.addEventListener("blur",function(){ t.text=name.textContent.trim()||t.text; persist(); });
-    top.appendChild(name);
-    var del=el("button","mini","✕"); del.title="刪除";
-    del.addEventListener("click",function(){ state.tasks=state.tasks.filter(function(x){return x!==t;}); persist(); renderTasks(); });
-    top.appendChild(del);
-    card.appendChild(top);
+  var top=el("div","taskcard__top");
+  var cb=document.createElement("input"); cb.type="checkbox"; cb.checked=!!t.done;
+  cb.addEventListener("change",function(){ t.done=cb.checked; persist(); renderTasks(); });
+  top.appendChild(cb);
+  var name=el("div","taskcard__name",t.text); name.contentEditable="true"; name.spellcheck=false;
+  name.addEventListener("blur",function(){ t.text=name.textContent.trim()||t.text; persist(); });
+  top.appendChild(name);
+  var del=el("button","mini","✕"); del.title="刪除";
+  del.addEventListener("click",function(){ state.tasks=state.tasks.filter(function(x){return x!==t;}); persist(); renderTasks(); });
+  top.appendChild(del);
+  card.appendChild(top);
 
-    var urlRow=el("div","taskcard__row");
-    urlRow.appendChild(el("label","taskcard__lbl","網址"));
-    var urlWrap=el("div","taskcard__urlwrap");
-    var urlInput=document.createElement("input"); urlInput.type="url"; urlInput.placeholder="貼上網址…";
-    urlInput.value=t.url||"";
-    urlInput.addEventListener("change",function(){ t.url=urlInput.value.trim(); persist(); renderTasks(); });
-    urlWrap.appendChild(urlInput);
-    if(t.url){
-      var go=document.createElement("a"); go.className="taskcard__go"; go.href=t.url;
-      go.target="_blank"; go.rel="noopener"; go.title="開啟連結"; go.textContent="↗";
-      urlWrap.appendChild(go);
-    }
-    urlRow.appendChild(urlWrap);
-    card.appendChild(urlRow);
+  var urlRow=el("div","taskcard__row");
+  urlRow.appendChild(el("label","taskcard__lbl","網址"));
+  var urlWrap=el("div","taskcard__urlwrap");
+  var urlInput=document.createElement("input"); urlInput.type="url"; urlInput.placeholder="貼上網址…";
+  urlInput.value=t.url||"";
+  urlInput.addEventListener("change",function(){ t.url=urlInput.value.trim(); persist(); renderTasks(); });
+  urlWrap.appendChild(urlInput);
+  if(t.url){
+    var go=document.createElement("a"); go.className="taskcard__go"; go.href=t.url;
+    go.target="_blank"; go.rel="noopener"; go.title="開啟連結"; go.textContent="↗";
+    urlWrap.appendChild(go);
+  }
+  urlRow.appendChild(urlWrap);
+  card.appendChild(urlRow);
 
-    var splitRow=el("div","taskcard__row taskcard__row--split");
-    var ddWrap=el("div","taskcard__deadline");
-    ddWrap.appendChild(el("label","taskcard__lbl","期限"));
-    var ddRow=el("div","taskcard__ddrow");
-    var ddInput=document.createElement("input"); ddInput.type="date"; ddInput.value=t.deadline||"";
-    ddInput.addEventListener("change",function(){ t.deadline=ddInput.value; persist(); renderTasks(); });
-    ddRow.appendChild(ddInput);
-    var info=deadlineInfo(t.deadline);
-    if(info.text) ddRow.appendChild(el("span","taskcard__dd"+(info.warn?" warn":""),info.text));
-    ddWrap.appendChild(ddRow);
-    splitRow.appendChild(ddWrap);
+  var splitRow=el("div","taskcard__row taskcard__row--split");
+  var ddWrap=el("div","taskcard__deadline");
+  ddWrap.appendChild(el("label","taskcard__lbl","期限"));
+  var ddRow=el("div","taskcard__ddrow");
+  var ddInput=document.createElement("input"); ddInput.type="date"; ddInput.value=t.deadline||"";
+  ddInput.addEventListener("change",function(){ t.deadline=ddInput.value; persist(); renderTasks(); });
+  ddRow.appendChild(ddInput);
+  var info=deadlineInfo(t.deadline);
+  if(info.text&&!t.done) ddRow.appendChild(el("span","taskcard__dd"+(info.warn?" warn":""),info.text));
+  ddWrap.appendChild(ddRow);
+  splitRow.appendChild(ddWrap);
 
-    splitRow.appendChild(buildWhoPills(t,renderTasks));
-    card.appendChild(splitRow);
+  splitRow.appendChild(buildWhoPills(t,renderTasks));
+  card.appendChild(splitRow);
 
-    var noteRow=el("div","taskcard__row");
-    noteRow.appendChild(el("label","taskcard__lbl","備註"));
-    var note=el("div","taskcard__note"); note.contentEditable="true"; note.spellcheck=false;
-    note.setAttribute("data-ph","加一點備註…"); note.textContent=t.note||"";
-    note.addEventListener("blur",function(){ t.note=note.textContent.trim(); persist(); });
-    noteRow.appendChild(note);
-    card.appendChild(noteRow);
+  var noteRow=el("div","taskcard__row");
+  noteRow.appendChild(el("label","taskcard__lbl","備註"));
+  var note=el("div","taskcard__note"); note.contentEditable="true"; note.spellcheck=false;
+  note.setAttribute("data-ph","加一點備註…"); note.textContent=t.note||"";
+  note.addEventListener("blur",function(){ t.note=note.textContent.trim(); persist(); });
+  noteRow.appendChild(note);
+  card.appendChild(noteRow);
 
-    w.appendChild(card);
-  });
+  return card;
 }
 
 /* ============ packing(要帶):卡片版,依名稱自動猜一個對應的 icon ============ */
